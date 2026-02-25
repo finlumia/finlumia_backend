@@ -9,7 +9,6 @@ import java.util.List;
 
 @Data
 public class InsertTableView {
-
     @Schema(description = "Código da operação")
     @JsonProperty(value = "cod", required = true)
     private Integer cod;
