@@ -1,4 +1,4 @@
-package com.finlumia.social;
+package com.finlumia.configurator;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
