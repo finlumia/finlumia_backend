@@ -1,0 +1,53 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.0.5' apply false
+	id 'io.spring.dependency-management' version '1.1.7' apply false
+}
+
+subprojects {
+	apply plugin: 'java'
+	apply plugin: 'io.spring.dependency-management'
+
+	group = 'br.com.finlumia'
+	version = '0.0.1-SNAPSHOT'
+
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(25)
+		}
+	}
+
+	configurations {
+		compileOnly {
+			extendsFrom annotationProcessor
+		}
+	}
+
+	repositories {
+		mavenCentral()
+	}
+
+	dependencyManagement {
+		imports {
+			mavenBom "org.springframework.boot:spring-boot-dependencies:4.0.5"
+		}
+	}
+
+	dependencies {
+		// Lombok (todos os módulos usam)
+		compileOnly 'org.projectlombok:lombok'
+		annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+		annotationProcessor 'org.projectlombok:lombok'
+
+		// Testes (todos os módulos usam)
+		testImplementation 'org.springframework.boot:spring-boot-starter-restclient-test'
+		testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
+		testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+		testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+		testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	}
+
+	tasks.named('test') {
+		useJUnitPlatform()
+	}
+}

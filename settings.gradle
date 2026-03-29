@@ -1,0 +1,6 @@
+rootProject.name = 'finlumia_backend'
+
+include 'shared-config'
+include 'configurator'
+include 'identity'
+include 'movement'
