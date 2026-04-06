@@ -10,9 +10,9 @@ import jakarta.validation.constraints.Size;
 public class CreateTableRequest {
         @NotBlank(message = "Schema é obrigatório")
         @Size(min = 1, max = 63, message = "Schema deve ter entre 1 e 63 caracteres")
-        @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Schema deve conter apenas letras, números e underline")
+        @Pattern(regexp = "^[0-9]+$", message = "Schema deve conter apenas letras, números e underline")
         @JsonProperty("schema")
-        private String schema;
+        private Long schema;
 
         @NotBlank(message = "Name é obrigatório")
         @Size(min = 1, max = 63, message = "Name deve ter entre 1 e 63 caracteres")

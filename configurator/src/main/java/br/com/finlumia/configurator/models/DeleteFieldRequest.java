@@ -6,10 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class DeleteTableRequest {
+public class DeleteFieldRequest {
 
     @NotNull(message = "Key é obrigatório")
     @JsonProperty("key")
     private Long key;
-
 }

@@ -2,6 +2,10 @@ package br.com.finlumia.shared.views;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import lombok.Data;
+
+
+@Data
 public class DialogDefault {
     @JsonProperty("code")
     private Integer code;

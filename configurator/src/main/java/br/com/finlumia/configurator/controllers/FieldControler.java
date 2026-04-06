@@ -9,53 +9,53 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.finlumia.configurator.models.CreateTableRequest;
-import br.com.finlumia.configurator.models.DeleteTableRequest;
-import br.com.finlumia.configurator.models.UpdateTableRequest;
-import br.com.finlumia.configurator.services.TableService;
+import br.com.finlumia.configurator.models.CreateFieldRequest;
+import br.com.finlumia.configurator.models.DeleteFieldRequest;
+import br.com.finlumia.configurator.models.UpdateFieldRequest;
+import br.com.finlumia.configurator.services.FieldService;
 import br.com.finlumia.shared.views.DialogDefault;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/configurator")
-public class TableController {
+public class FieldControler {
 
     private static final String HEADER_KEY_USER = "X-Key-User";
 
-    private final TableService tableService;
+    private final FieldService fieldService;
 
-    public TableController(TableService tableService) {
-        this.tableService = tableService;
+    public FieldControler(FieldService fieldService) {
+        this.fieldService = fieldService;
     }
 
-    @PostMapping("/tables")
-    public ResponseEntity<DialogDefault> createTable(
+    @PostMapping("/fields")
+    public ResponseEntity<DialogDefault> createField(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
-            @Valid @RequestBody CreateTableRequest request) {
-        DialogDefault response = tableService.createTable(keyUser, request);
+            @Valid @RequestBody CreateFieldRequest request) {
+        DialogDefault response = fieldService.createField(keyUser, request);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    @PutMapping("/tables")
-    public ResponseEntity<DialogDefault> updateTable(
+    @PutMapping("/fields")
+    public ResponseEntity<DialogDefault> updateField(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
-            @Valid @RequestBody UpdateTableRequest request) {
-        DialogDefault response = tableService.updateTable(keyUser, request);
+            @Valid @RequestBody UpdateFieldRequest request) {
+        DialogDefault response = fieldService.updateField(keyUser, request);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    @DeleteMapping("/tables")
-    public ResponseEntity<DialogDefault> deleteTable(
+    @DeleteMapping("/fields")
+    public ResponseEntity<DialogDefault> deleteField(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
-            @Valid @RequestBody DeleteTableRequest request) {
-        DialogDefault response = tableService.deleteTable(keyUser, request);
+            @Valid @RequestBody DeleteFieldRequest request) {
+        DialogDefault response = fieldService.deleteField(keyUser, request);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 
-    @PostMapping("/tables/physical")
-    public ResponseEntity<DialogDefault> createPhysicalTables(
+    @PostMapping("/fields/physical")
+    public ResponseEntity<DialogDefault> syncPhysicalFields(
             @RequestHeader(HEADER_KEY_USER) Long keyUser) {
-        DialogDefault response = tableService.createPhysicalTablesFromConfigurator(keyUser);
+        DialogDefault response = fieldService.syncPhysicalFieldsFromConfigurator(keyUser);
         return ResponseEntity.status(response.getCode()).body(response);
     }
 }
