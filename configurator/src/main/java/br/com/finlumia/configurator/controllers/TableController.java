@@ -29,33 +29,25 @@ public class TableController {
     }
 
     @PostMapping("/tables")
-    public ResponseEntity<DialogDefault> createTable(
+    public DialogDefault createTable(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
             @Valid @RequestBody CreateTableRequest request) {
-        DialogDefault response = tableService.createTable(keyUser, request);
-        return ResponseEntity.status(response.getCode()).body(response);
+        return tableService.createTable(keyUser, request);
     }
 
     @PutMapping("/tables")
-    public ResponseEntity<DialogDefault> updateTable(
+    public DialogDefault updateTable(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
             @Valid @RequestBody UpdateTableRequest request) {
-        DialogDefault response = tableService.updateTable(keyUser, request);
-        return ResponseEntity.status(response.getCode()).body(response);
+        return tableService.updateTable(keyUser, request);
     }
 
     @DeleteMapping("/tables")
-    public ResponseEntity<DialogDefault> deleteTable(
+    public DialogDefault deleteTable(
             @RequestHeader(HEADER_KEY_USER) Long keyUser,
             @Valid @RequestBody DeleteTableRequest request) {
-        DialogDefault response = tableService.deleteTable(keyUser, request);
-        return ResponseEntity.status(response.getCode()).body(response);
+        return tableService.deleteTable(keyUser, request);
     }
 
-    @PostMapping("/tables/physical")
-    public ResponseEntity<DialogDefault> createPhysicalTables(
-            @RequestHeader(HEADER_KEY_USER) Long keyUser) {
-        DialogDefault response = tableService.createPhysicalTablesFromConfigurator(keyUser);
-        return ResponseEntity.status(response.getCode()).body(response);
-    }
+    
 }

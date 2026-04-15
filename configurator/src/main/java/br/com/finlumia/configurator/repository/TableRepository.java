@@ -3,263 +3,115 @@ package br.com.finlumia.configurator.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 
-import br.com.finlumia.configurator.models.ConfiguratorFieldRow;
 import br.com.finlumia.configurator.models.CreateTableRequest;
 import br.com.finlumia.configurator.models.DeleteTableRequest;
-import br.com.finlumia.configurator.models.PendingConfiguratorTable;
 import br.com.finlumia.configurator.models.UpdateTableRequest;
-import br.com.finlumia.configurator.repository.sql.FieldSql;
 import br.com.finlumia.configurator.repository.sql.TableSql;
 import br.com.finlumia.shared.exception.FinlumiaException;
 import br.com.finlumia.shared.views.DialogDefault;
+import javax.sql.DataSource;
 
 @Repository
 public class TableRepository {
-
-    protected final DataSource postgresDataSource;
+    private final DataSource postgresDataSource;
 
     public TableRepository(
             @Qualifier("postgresDataSource") DataSource postgresDataSource) {
         this.postgresDataSource = postgresDataSource;
     }
 
-    public DialogDefault createTable(Long keyUser, CreateTableRequest createTableRequest) {
+    public DialogDefault insertTable(Long keyUser, CreateTableRequest request) {
 
-        try (Connection bancoFinlumia = postgresDataSource.getConnection();
-                PreparedStatement createTableStmt = bancoFinlumia.prepareStatement(TableSql.INSERT_TABLE)) {
-                    
-                    createTableStmt.setBoolean(1, false);
-                    createTableStmt.setBoolean(2, false);
-                    createTableStmt.setLong(3, createTableRequest.getSchema());
-                    createTableStmt.setString(4, createTableRequest.getName());
-                    createTableStmt.setString(5, createTableRequest.getDisplayName());
-                    createTableStmt.setString(6, createTableRequest.getDisplayDescription());
-                    createTableStmt.setLong(7, keyUser);
-                    createTableStmt.setLong(8, keyUser);
-                    createTableStmt.setBoolean(9, false);
+        try (Connection connection = postgresDataSource.getConnection();
+                PreparedStatement preparedStatement = connection.prepareStatement(TableSql.INSERT_TABLE)) {
+            connection.setAutoCommit(false);
 
-                    bancoFinlumia.setAutoCommit(false);
-            try (ResultSet rs = createTableStmt.executeQuery()) {
-                if(rs.next()){
-                    DialogDefault dialogDefault = new DialogDefault();
-                    dialogDefault.setCode(201);
-                    dialogDefault.setTitle("Gravação realizada com sucesso!");
-                    dialogDefault.setMensage("A tabela foi gravada com sucesso!");
-                    return dialogDefault;
+            preparedStatement.setLong(1, keyUser);
+            preparedStatement.setString(2, request.getSchemaName());
+            preparedStatement.setString(3, request.getTableName());
+            preparedStatement.setString(4, request.getDisplayName());
+            preparedStatement.setString(5, request.getDescription());
+            preparedStatement.setLong(6, keyUser);
+            preparedStatement.setLong(7, keyUser);
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new DialogDefault(200, "Table created successfully", "Tabela criada com sucesso");
                 }
-                bancoFinlumia.rollback();
-                throw new FinlumiaException(
-                    500,
-                    "Erro ao gravar dados da tabela!",
-                    "Não foi possível gravar a tabela no banco de dados. Contate o suporte!"
-                );  
-            } 
-        } catch (FinlumiaException e) {
-            throw e;
+                throw new FinlumiaException(404, "Falha ao realizar insert de tabela",
+                        "Não foi possível realizar o insert da tabela");
+            } catch (Exception e) {
+                throw new FinlumiaException(500, "Falha ao realizar insert de tabela",
+                        "Não foi possível realizar o insert da tabela");
+            }
+
         } catch (Exception e) {
-            throw new FinlumiaException(
-                500,
-                "Erro ao gravar dados da tabela!",
-                "Não foi possível gravar a tabela no banco de dados. Contate o suporte!"
-            );
+            throw new FinlumiaException(500, "Falha ao realizar insert de tabela",
+                    "Não foi possível realizar o insert da tabela");
         }
 
     }
-
 
     public DialogDefault updateTable(Long keyUser, UpdateTableRequest updateTableRequest) {
 
-        try (Connection bancoFinlumia = postgresDataSource.getConnection();
-                PreparedStatement updateTableStmt = bancoFinlumia.prepareStatement(TableSql.UPDATE_TABLE)) {
-    
-                    updateTableStmt.setBoolean(1, updateTableRequest.getLock());
-                    updateTableStmt.setString(2, updateTableRequest.getSchemaName());
-                    updateTableStmt.setString(3, updateTableRequest.getName());
-                    updateTableStmt.setString(4, updateTableRequest.getDisplayName());
-                    updateTableStmt.setString(5, updateTableRequest.getDisplayDescription());
-                    updateTableStmt.setLong(6, keyUser);
-                    updateTableStmt.setLong(7, updateTableRequest.getKey());
-    
-                    bancoFinlumia.setAutoCommit(false);
-    
-            try {
-                int rows = updateTableStmt.executeUpdate();
-                if (rows > 0) {
-                    bancoFinlumia.commit();
-                    DialogDefault dialogDefault = new DialogDefault();
-                    dialogDefault.setCode(200);
-                    dialogDefault.setTitle("Atualização realizada com sucesso!");
-                    dialogDefault.setMensage("A tabela foi atualizada com sucesso!");
-                    return dialogDefault;
+        try (Connection connection = postgresDataSource.getConnection();
+                PreparedStatement preparedStatement = connection.prepareStatement(TableSql.UPDATE_TABLE)) {
+            connection.setAutoCommit(false);
+            preparedStatement.setString(1, updateTableRequest.getDisplayName());
+            preparedStatement.setString(2, updateTableRequest.getDescription());
+            preparedStatement.setLong(3, keyUser);
+            preparedStatement.setLong(4, updateTableRequest.getKeyTable());
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new DialogDefault(200, "Tabela atualizada com sucesso",
+                            "Os registros foram atualizados com sucesso");
                 }
-                bancoFinlumia.rollback();
-                throw new FinlumiaException(
-                    500,
-                    "Erro ao atualizar dados da tabela!",
-                    "Não foi possível atualizar a tabela no banco de dados. Contate o suporte!"
-                );
-            } catch (FinlumiaException e) {
-                throw e;
+                throw new FinlumiaException(404, "Falha ao realizar atualização de tabela",
+                        "Não foi possível realizar a atualização da tabela");
             } catch (Exception e) {
-                bancoFinlumia.rollback();
-                throw new FinlumiaException(
-                    500,
-                    "Erro ao atualizar dados da tabela!",
-                    "Não foi possível atualizar a tabela no banco de dados. Contate o suporte!"
-                );
+                throw new FinlumiaException(500, "Falha ao realizar atualização de tabela",
+                        "Não foi possível realizar a atualização da tabela");
             }
-    
-        } catch (FinlumiaException e) {
-            throw e;
+
         } catch (Exception e) {
-            throw new FinlumiaException(
-                500,
-                "Erro ao atualizar dados da tabela!",
-                "Não foi possível atualizar a tabela no banco de dados. Contate o suporte!"
-            );
+            throw new FinlumiaException(500, "Falha ao realizar atualização de tabela",
+                    "Não foi possível realizar a atualização da tabela");
         }
-    
+
     }
-    
+
     public DialogDefault deleteTable(Long keyUser, DeleteTableRequest deleteTableRequest) {
-    
-        try (Connection bancoFinlumia = postgresDataSource.getConnection();
-                PreparedStatement deleteTableStmt = bancoFinlumia.prepareStatement(TableSql.DELETE_TABLE)) {
-    
-                    deleteTableStmt.setLong(1, keyUser);
-                    deleteTableStmt.setLong(2, deleteTableRequest.getKey());
-    
-                    bancoFinlumia.setAutoCommit(false);
-    
-            try {
-                int rows = deleteTableStmt.executeUpdate();
-                if (rows > 0) {
-                    bancoFinlumia.commit();
-                    DialogDefault dialogDefault = new DialogDefault();
-                    dialogDefault.setCode(200);
-                    dialogDefault.setTitle("Exclusão realizada com sucesso!");
-                    dialogDefault.setMensage("A tabela foi excluída com sucesso!");
-                    return dialogDefault;
+
+        try (Connection connection = postgresDataSource.getConnection();
+                PreparedStatement preparedStatement = connection.prepareStatement(TableSql.DELETE_TABLE)) {
+            connection.setAutoCommit(false);
+            preparedStatement.setLong(1, deleteTableRequest.getKeyTable());
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new DialogDefault(200, "Tabela deletada com sucesso",
+                            "Os registros foram deletada com sucesso");
                 }
-                bancoFinlumia.rollback();
-                throw new FinlumiaException(
-                    500,
-                    "Erro ao excluir dados da tabela!",
-                    "Não foi possível excluir a tabela. Verifique se ela já foi criada fisicamente no banco de dados!"
-                );
-            } catch (FinlumiaException e) {
-                throw e;
+                throw new FinlumiaException(404, "Falha ao realizar o delete  de tabela",
+                        "Não foi possível realizar o delete  da tabela");
             } catch (Exception e) {
-                bancoFinlumia.rollback();
-                throw new FinlumiaException(
-                    500,
-                    "Erro ao excluir dados da tabela!",
-                    "Não foi possível excluir a tabela no banco de dados. Contate o suporte!"
-                );
+                throw new FinlumiaException(500, "Falha ao realizar o delete de tabela",
+                        "Não foi possível realizar o delete  da tabela");
             }
-    
-        } catch (FinlumiaException e) {
-            throw e;
+
         } catch (Exception e) {
-            throw new FinlumiaException(
-                500,
-                "Erro ao excluir dados da tabela!",
-                "Não foi possível excluir a tabela no banco de dados. Contate o suporte!"
-            );
+            throw new FinlumiaException(500, "Falha ao realizar o delete  de tabela",
+                    "Não foi possível realizar  o delete  da tabela");
         }
-    
+
     }
 
-    public List<PendingConfiguratorTable> fetchPendingConfiguratorTables() {
-        List<PendingConfiguratorTable> list = new ArrayList<>();
-        try (Connection conn = postgresDataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(TableSql.CREATE_TABLE_SELECT_PENDING);
-                ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                Object schemaObj = rs.getObject("tab_schema_name");
-                Object tableObj = rs.getObject("tab_table_name");
-                list.add(new PendingConfiguratorTable(
-                        rs.getLong("k_e_y"),
-                        schemaObj != null ? String.valueOf(schemaObj).trim() : null,
-                        tableObj != null ? String.valueOf(tableObj).trim() : null,
-                        rs.getString("tab_display_name")));
-            }
-            return list;
-        } catch (Exception e) {
-            throw new FinlumiaException(
-                    500,
-                    "Erro ao consultar tabelas pendentes!",
-                    "Não foi possível ler o configurador de tabelas. Contate o suporte!");
-        }
-    }
 
-    public List<ConfiguratorFieldRow> fetchConfiguratorFieldsForTable(long tableKey) {
-        List<ConfiguratorFieldRow> fields = new ArrayList<>();
-        try (Connection conn = postgresDataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(FieldSql.SELECT_FIELDS_BY_TABLE_KEY)) {
-            ps.setLong(1, tableKey);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Object fnObj = rs.getObject("fie_field_name");
-                    String fieldName = fnObj != null ? String.valueOf(fnObj).trim() : null;
-                    fields.add(new ConfiguratorFieldRow(
-                            fieldName,
-                            rs.getString("fie_data_type"),
-                            (Integer) rs.getObject("fie_field_length"),
-                            (Integer) rs.getObject("fie_field_precision"),
-                            (Integer) rs.getObject("fie_field_scale"),
-                            rs.getBoolean("fie_is_required"),
-                            rs.getBoolean("fie_is_primary_key"),
-                            rs.getBoolean("fie_is_foreign_key"),
-                            rs.getString("fie_fk_reference_table"),
-                            rs.getString("fie_fk_reference_column"),
-                            rs.getString("fie_default_value"),
-                            rs.getBoolean("fie_is_unique"),
-                            rs.getBoolean("fie_is_indexed")));
-                }
-            }
-            return fields;
-        } catch (Exception e) {
-            throw new FinlumiaException(
-                    500,
-                    "Erro ao consultar campos da tabela!",
-                    "Não foi possível ler os campos no configurador. Contate o suporte!");
-        }
-    }
 
-    public void executeDdlStatement(String sql) {
-        try (Connection conn = postgresDataSource.getConnection();
-                Statement st = conn.createStatement()) {
-            st.execute(sql);
-        } catch (Exception e) {
-            throw new FinlumiaException(
-                    500,
-                    "Erro ao executar DDL!",
-                    e.getMessage() != null ? e.getMessage() : "Falha na execução SQL.");
-        }
-    }
-
-    public boolean markConfiguratorTablePhysicalCreated(long keyUser, long tableKey) {
-        try (Connection conn = postgresDataSource.getConnection();
-                PreparedStatement ps = conn.prepareStatement(TableSql.UPDATE_TABLE_MARK_PHYSICAL_CREATED)) {
-            ps.setLong(1, keyUser);
-            ps.setLong(2, tableKey);
-            return ps.executeUpdate() > 0;
-        } catch (Exception e) {
-            throw new FinlumiaException(
-                    500,
-                    "Erro ao atualizar flag de criação física!",
-                    "Não foi possível marcar a tabela como criada. Contate o suporte!");
-        }
-    }
 
 }
