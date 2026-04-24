@@ -158,3 +158,7 @@ Pré-requisitos: JDK 25, Gradle Wrapper (incluído no repositório), PostgreSQL 
 ```
 
 Cada módulo `configurator`, `identity` e `movement` é uma aplicação Spring Boot independente; variáveis de conexão e perfis devem ser definidos em `application` properties ou variáveis de ambiente do seu ambiente.
+
+Rodar o projeto localmente
+
+./gradlew :configurator:bootRun

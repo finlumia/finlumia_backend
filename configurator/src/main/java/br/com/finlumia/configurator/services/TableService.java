@@ -28,6 +28,7 @@ public class TableService {
 
 
     private DialogDefault _createTable(Long keyUser, CreateTableRequest request) {
+        System.out.println("CAIU AQUI");
         return tableRepository.insertTable(keyUser, request);
     }
 
