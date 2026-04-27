@@ -36,6 +36,5 @@ public class GenericController {
         return genericRegisterService.createGenericLine(keyUser, genericRegisterRequest);
     }
 
-
-
+    
 }

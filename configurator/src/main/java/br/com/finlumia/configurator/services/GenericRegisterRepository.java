@@ -3,9 +3,7 @@ package br.com.finlumia.configurator.services;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.sql.DataSource;
@@ -15,7 +13,6 @@ import org.springframework.stereotype.Repository;
 
 import br.com.finlumia.configurator.models.GenericRegisterRequest;
 import br.com.finlumia.shared.exception.FinlumiaException;
-import br.com.finlumia.shared.views.DialogDefault;
 
 @Repository
 public class GenericRegisterRepository {
@@ -38,13 +35,6 @@ public class GenericRegisterRepository {
                     and tb.d_e_l_e_t_e = false
                 order by  fd.fie_display_order asc
                     """;
-        public static String INSERT_GENERIC_LINE = """
-                insert into ?.?
-                    %s
-                values
-                    %s
-                    """;
-
     }
 
     protected class DataTable {
@@ -100,16 +90,12 @@ public class GenericRegisterRepository {
 
     protected boolean insertGenericLine(DataTable dataTable, String insertFields, String insertValues) {
         try (Connection connection = postgresDataSource.getConnection();
-                PreparedStatement preparedStatement = connection.prepareStatement(QueryGeneric.INSERT_GENERIC_LINE)) {
-            preparedStatement.setString(1, dataTable.schemaName);
-            preparedStatement.setString(2, dataTable.tableName);
-            preparedStatement.setString(3, insertFields);
-            preparedStatement.setString(4, insertValues);
-            if(preparedStatement.executeUpdate() >0){
+                PreparedStatement preparedStatement = connection
+                        .prepareStatement(buildInsertSql(dataTable, insertFields, insertValues))) {
+            if (preparedStatement.executeUpdate() > 0) {
                 return true;
             }
             return false;
-
         } catch (FinlumiaException e) {
             throw e;
         } catch (Exception e) {
@@ -118,6 +104,29 @@ public class GenericRegisterRepository {
                     "Erro ao realizar o insert na tabela",
                     "[insertGenericLine]: " + e.getMessage());
         }
+    }
+
+    private String buildInsertSql(DataTable dataTable, String insertFields, String insertValues) {
+        return """
+                insert into %s.%s
+                    %s
+                values
+                    %s
+                """.formatted(
+                quoteIdentifier(dataTable.schemaName),
+                quoteIdentifier(dataTable.tableName),
+                insertFields,
+                insertValues);
+    }
+
+    private String quoteIdentifier(String identifier) {
+        if (identifier == null || !identifier.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+            throw new FinlumiaException(
+                    400,
+                    "Nome de schema/tabela inválido",
+                    "Identificador inválido para operação de insert");
+        }
+        return "\"" + identifier + "\"";
     }
 
 }
