@@ -1,0 +1,40 @@
+package br.com.finlumia.configurator.controllers;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import br.com.finlumia.configurator.models.GenericRegisterRequest;
+import br.com.finlumia.configurator.services.GenericRegisterService;
+import br.com.finlumia.shared.views.DialogDefault;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/configurator")
+@Tag(name = "Configurador de genericos", description = "Endpoints para operações de genericos no configurador.")            
+public class GenericController {
+
+    @Autowired
+    private GenericRegisterService genericRegisterService;
+        
+    @PostMapping("/generic_register")
+    @Operation(summary = "Realiza o cadastro da tabela", description = "Realiza o cadastro da tabela no configurador.")
+    @ApiResponse(responseCode = "200", description = "Tabela cadastrada com sucesso")
+    @ApiResponse(responseCode = "401", description = "Não autorizado")
+    @ApiResponse(responseCode = "404", description = "Tabela não encontrada")
+    @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    public DialogDefault createGenericLine(
+            @RequestAttribute("keyUser") Long keyUser,
+            @Valid @RequestBody GenericRegisterRequest genericRegisterRequest) {
+        return genericRegisterService.createGenericLine(keyUser, genericRegisterRequest);
+    }
+
+
+
+}
