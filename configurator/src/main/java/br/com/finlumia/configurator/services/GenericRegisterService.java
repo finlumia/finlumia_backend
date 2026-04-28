@@ -2,14 +2,18 @@ package br.com.finlumia.configurator.services;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.com.finlumia.configurator.models.GenericListRequest;
 import br.com.finlumia.configurator.models.GenericRegisterRequest;
 import br.com.finlumia.configurator.services.GenericRegisterRepository.DataTable;
 import br.com.finlumia.configurator.services.GenericRegisterRepository.Field;
+import br.com.finlumia.configurator.views.GenericListResponse;
 import br.com.finlumia.shared.exception.FinlumiaException;
 import br.com.finlumia.shared.views.DialogDefault;
 
@@ -31,17 +35,30 @@ public class GenericRegisterService {
         return _deleteGenericLine(keyUser, request);
     }
 
-    public DialogDefault getGenericList(Long keyUser, GenericRegisterRequest request) {
+    public GenericListResponse listGeneric(Long keyUser, GenericListRequest request) {
         return _getGenericList(keyUser, request);
     }
 
-    private DialogDefault _getGenericList(Long keyUser, GenericRegisterRequest request) {
-        return new DialogDefault(null, null, null);
+    private GenericListResponse _getGenericList(Long keyUser, GenericListRequest request) {
+
+        DataTable dataTable = genericRegisterRepository.getGenericDataTable(keyUser, request.getSlugTable());
+
+        // Montar campos da tabela para realizar o insert
+        List<String> listFields = new ArrayList<>();
+        StringBuilder selectFieldsBuilder = new StringBuilder("(");
+        for (Field field : dataTable.fields.values()) {
+            listFields.add(field.fieldName);
+            selectFieldsBuilder.append(field.fieldName).append(",");
+        }
+        String insertFields = selectFieldsBuilder.substring(0, selectFieldsBuilder.length() - 1) + ")";
+
+        return genericRegisterRepository.getGenericItemTable(keyUser, dataTable, listFields, insertFields, 50);
+
     }
 
     private DialogDefault _createGenericLine(Long keyUser, GenericRegisterRequest request) {
 
-        DataTable dataTable = genericRegisterRepository.getGenericList(keyUser, request);
+        DataTable dataTable = genericRegisterRepository.getGenericDataTable(keyUser, request.getSlugTable());
 
         // Associa o map do request com o map da tabela
         Map<Long, String> fields = request.getFields();
@@ -75,7 +92,7 @@ public class GenericRegisterService {
         }
         String insertValues = insertValuesBuilder.substring(0, insertValuesBuilder.length() - 1) + ")";
 
-        //Inserir linha na tabela
+        // Inserir linha na tabela
         boolean insertSuccess = genericRegisterRepository.insertGenericLine(dataTable, insertFields, insertValues);
         if (insertSuccess) {
             return new DialogDefault(201, "Insert realizado com sucesso", "Linha inserida com sucesso");
@@ -125,7 +142,8 @@ public class GenericRegisterService {
             throw new FinlumiaException(
                     400,
                     "Valor inválido para o tipo da coluna",
-                    "Campo [" + fieldName + "] possui valor inválido [" + fieldValue + "] para tipo [" + fieldType + "]");
+                    "Campo [" + fieldName + "] possui valor inválido [" + fieldValue + "] para tipo [" + fieldType
+                            + "]");
         }
     }
 

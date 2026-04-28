@@ -7,8 +7,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.com.finlumia.configurator.models.GenericListRequest;
 import br.com.finlumia.configurator.models.GenericRegisterRequest;
 import br.com.finlumia.configurator.services.GenericRegisterService;
+import br.com.finlumia.configurator.views.GenericListResponse;
 import br.com.finlumia.shared.views.DialogDefault;
 import io.swagger.v3.oas.annotations.Operation;
 
@@ -35,6 +37,22 @@ public class GenericController {
             @Valid @RequestBody GenericRegisterRequest genericRegisterRequest) {
         return genericRegisterService.createGenericLine(keyUser, genericRegisterRequest);
     }
+
+    @PostMapping("/generic_list")
+    @Operation(summary = "Realiza a listagem genérica", description = "Realiza a listagem genérica de uma tabela no configurador.")
+    @ApiResponse(responseCode = "200", description = "Listagem genérica realizada com sucesso")
+    @ApiResponse(responseCode = "401", description = "Não autorizado")
+    @ApiResponse(responseCode = "404", description = "Listagem genérica não encontrada para a tabela informada")
+    @ApiResponse(responseCode = "500", description = "Erro interno do servidor ao realizar a listagem genérica") 
+    public GenericListResponse listGeneric(
+            @RequestAttribute("keyUser") Long keyUser,
+            @Valid @RequestBody GenericListRequest genericRegisterRequest) {
+        return genericRegisterService.listGeneric(keyUser, genericRegisterRequest);
+    }
+
+    
+
+    
 
     
 }

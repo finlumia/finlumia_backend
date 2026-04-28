@@ -1,36 +1,19 @@
 package br.com.finlumia.configurator.views;
 
 import java.util.List;
-import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class GenericListResponse {
 
-    @JsonProperty("tableKey")
-    private long tableKey;
+    @JsonProperty("tableSlug")
+    private String tableSlug;
 
-    @JsonProperty("tableDisplayName")
-    private String tableDisplayName;
-
-    @JsonProperty("columns")
-    private List<GenericListColumnView> columns;
-
-    /**
-     * Botões por linha, lidos de {@code tab_description} em JSON (chave {@code rowActions}) quando presente.
-     */
-    @JsonProperty("rowActions")
-    private List<GenericListRowActionView> rowActions;
-
-    @JsonProperty("rows")
-    private List<Map<String, Object>> rows;
+    @JsonProperty("linhas")
+    private List<Linha> linhas;
 
     @JsonProperty("totalElements")
     private long totalElements;
@@ -40,4 +23,25 @@ public class GenericListResponse {
 
     @JsonProperty("pageSize")
     private int pageSize;
+
+    @Data
+    public class Linha {
+        @JsonProperty("identifier")
+        private Long identifier;
+
+        @JsonProperty("column")
+        private List<Column> column;
+    }
+
+    @Data
+    public class Column {
+        @JsonProperty("fieldName")
+        private String fieldName;
+
+        @JsonProperty("fieldValue")
+        private String fieldValue;
+    }
+
+
+
 }
