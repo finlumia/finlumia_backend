@@ -1,0 +1,17 @@
+# Default: ignore everything to keep build context tiny.
+**
+
+# Include only Dockerfiles used by the build scripts.
+!docker/scripts/
+!docker/scripts/*.Dockerfile
+
+# Include only application JAR artifacts required by each module image.
+!configurator/build/libs/*.jar
+!docs/build/libs/*.jar
+!identity/build/libs/*.jar
+!movement/build/libs/*.jar
+!ecommerce/build/libs/*.jar
+!hub/hub/build/libs/*.jar
+!pdv/build/libs/*.jar
+!salesforce/build/libs/*.jar
+!storefront/build/libs/*.jar

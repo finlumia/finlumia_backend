@@ -75,12 +75,12 @@ Monorepo **Gradle** com serviços **Spring Boot** em Java. Neste repositório es
 
 | Módulo Gradle        | Papel |
 |----------------------|--------|
-| `shared-config`      | Biblioteca compartilhada: Spring Web MVC, Security, OAuth2 Client, JDBC, validação, OpenAPI (Springdoc), exceções e DTOs comuns (ex.: `DialogDefault`). |
+| `shared`             | Biblioteca compartilhada: Spring Web MVC, Security, OAuth2 Client, JDBC, validação, OpenAPI (Springdoc), exceções e DTOs comuns (ex.: `DialogDefault`). |
 | `configurator`       | API do configurador: metadados de tabelas e campos no PostgreSQL, geração física de `CREATE TABLE` / `ALTER TABLE ... ADD COLUMN` a partir do configurador. |
-| `identity`           | Serviço de identidade (sobre `shared-config`). |
-| `movement`           | Serviço de movimentações (sobre `shared-config`). |
+| `identity`           | Serviço de identidade (sobre `shared`). |
+| `movement`           | Serviço de movimentações (sobre `shared`). |
 
-**Stack principal:** Java 25, Spring Boot 4.0.x, PostgreSQL (driver JDBC), Lombok.
+**Stack principal:** Java 21, Spring Boot 4.0.x, PostgreSQL (driver JDBC), Lombok.
 
 ---
 
@@ -105,7 +105,7 @@ Nos módulos de aplicação (por exemplo `configurator`), o código segue separa
 ### Dados e segurança
 
 - Conexão JDBC qualificada (`postgresDataSource`) para o PostgreSQL de aplicação.
-- Spring Security e OAuth2 Client disponíveis via `shared-config` (detalhes de proteção de endpoints por módulo evoluem com o projeto).
+- Spring Security e OAuth2 Client disponíveis via `shared` (detalhes de proteção de endpoints por módulo evoluem com o projeto).
 
 ### Diretrizes alinhadas ao produto
 
@@ -147,7 +147,7 @@ Nos módulos de aplicação (por exemplo `configurator`), o código segue separa
 
 ## Desenvolvimento local
 
-Pré-requisitos: JDK 25, Gradle Wrapper (incluído no repositório), PostgreSQL acessível conforme configuração do ambiente.
+Pré-requisitos: JDK 21, Gradle Wrapper (incluído no repositório), PostgreSQL acessível conforme configuração do ambiente.
 
 ```bash
 # compilar todos os módulos

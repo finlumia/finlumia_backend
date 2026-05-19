@@ -40,6 +40,15 @@ public class GenericListResponse {
 
         @JsonProperty("fieldValue")
         private String fieldValue;
+
+        @JsonProperty("color")
+        private String color;
+
+        @JsonProperty("dataType")
+        private String dataType;
+
+        @JsonProperty("largeColumn")
+        private boolean largeColumn;
     }
 
 

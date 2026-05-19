@@ -1,9 +1,15 @@
 HELP.md
 .gradle
 build/
+**/build/
+**/classes/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
+
+# liberar docker/build especificamente
+!docker/build/
+!docker/build/.gitkeep
 
 ### STS ###
 .apt_generated
@@ -35,3 +41,60 @@ out/
 
 ### VS Code ###
 .vscode/
+
+
+# Spring local profiles with credentials
+shared/src/main/resources/application-dev.properties
+shared/src/main/resources/application-pro.properties
+shared/src/main/resources/shared-dev.properties
+shared/src/main/resources/shared-pro.properties
+**/application-dev.properties
+**/application-pro.properties
+**/shared-dev.properties
+**/shared-pro.properties
+docker/base/*.tar
+docker/bases/*.tar
+docker/test/*.tar
+docker/build/*.tar
+docker/jdk/*.tar
+docker/jdk/zulu21.50.19-ca-jdk21.0.11-linux_x64.tar.gz
+!docker/base/.gitkeep
+!docker/build/.gitkeep
+!docker/test/.gitkeep
+!docker/jdk/.gitkeep
+# Environment files
+.env
+.env.*
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+*.jks
+*.pfx
+
+# Generic secret artifacts
+*credentials*
+*secret*
+*token*
+
+# Runtime/packaging artifacts
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.tmp
+*.temp
+*.pid
+hs_err_pid*
+replay_pid*
+
+# OS / editor leftovers
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+
+

@@ -1,0 +1,159 @@
+#!/usr/bin/env pwsh
+param(
+    [Parameter(Mandatory=$false, Position=0)]
+    [string]$module,
+    [switch]$all,
+    [switch]$t,
+    [switch]$c,
+    [switch]$s,
+    [switch]$pro,
+    [switch]$dev
+)
+
+$ErrorActionPreference = "Stop"
+
+$BASE_IMAGE = "finlumia/base:almalinux10-zulu21"
+$BASE_IMAGE_TAR = "docker/bases/finlumia-base-almalinux10-zulu21.tar"
+$DEV_CONTAINER = "finlumiadev"
+
+$HOST_PORTS_DEV = @{
+    "configurator" = 40571
+    "identity" = 40572
+    "movement" = 40573
+    "docs" = 40574
+}
+
+$HOST_PORTS_PRO = @{
+    "configurator" = 40571
+    "identity" = 40572
+    "movement" = 40573
+    "docs" = 40574
+}
+
+$CONTAINER_PORTS = @{
+    "configurator" = 40571
+    "identity" = 40572
+    "movement" = 40573
+    "docs" = 40574
+}
+
+$GRADLE_TASKS = @{
+    "configurator" = ":configurator:bootJar"
+    "identity" = ":identity:bootJar"
+    "movement" = ":movement:bootJar"
+    "docs" = ":docs:bootJar"
+}
+
+$VALID_MODULES = @("configurator","identity","movement","docs")
+
+if ($t -and $c) { Write-Host "ERRO: use -t ou -c."; exit 1 }
+if (-not $t -and -not $c) { Write-Host "ERRO: informe -t ou -c."; exit 1 }
+if ($s -and -not $t) { Write-Host "ERRO: -s so pode ser usado com -t."; exit 1 }
+if ($pro -and $dev) { Write-Host "ERRO: use -pro ou -dev."; exit 1 }
+if (-not $pro -and -not $dev) { Write-Host "ERRO: informe -pro ou -dev."; exit 1 }
+if ($all -and $module) { Write-Host "ERRO: use modulo unico ou -all."; exit 1 }
+if (-not $all -and -not $module) { Write-Host "ERRO: informe um modulo ou use -all."; exit 1 }
+if (-not $all -and ($VALID_MODULES -notcontains $module)) {
+    Write-Host "ERRO: modulo invalido. Use: $($VALID_MODULES -join ', ')"
+    exit 1
+}
+
+$PROFILE = if ($pro) { "pro" } else { "dev" }
+$TARGET_MODULES = if ($all) { $VALID_MODULES } else { @($module) }
+
+function Ensure-BaseImage {
+    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $BASE_IMAGE }
+    if ($exists) { return }
+
+    if (-not (Test-Path $BASE_IMAGE_TAR)) {
+        Write-Host "ERRO: arquivo da imagem base nao encontrado: $BASE_IMAGE_TAR"
+        exit 1
+    }
+
+    $loadOutput = docker load -i $BASE_IMAGE_TAR 2>&1
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha no docker load."; exit 1 }
+    $loadOutput | ForEach-Object { Write-Host $_ }
+
+    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $BASE_IMAGE }
+    if ($exists) { return }
+
+    $loadedImage = $loadOutput |
+        Select-String "^Loaded image: " |
+        ForEach-Object { $_.Line -replace "^Loaded image: ", "" } |
+        Select-Object -First 1
+
+    if (-not $loadedImage) {
+        Write-Host "ERRO: nao foi possivel identificar a imagem carregada para retag."
+        exit 1
+    }
+
+    docker tag $loadedImage $BASE_IMAGE
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao retaggear imagem base."; exit 1 }
+}
+
+if ($t -and $s) {
+    foreach ($currentModule in $TARGET_MODULES) {
+        $currentContainer = "test-${currentModule}-${PROFILE}"
+        $exists = docker ps -a --format "{{.Names}}" | Where-Object { $_ -eq $currentContainer }
+        if ($exists) {
+            docker stop $currentContainer | Out-Null
+            docker rm $currentContainer | Out-Null
+            Write-Host "Container removido: $currentContainer"
+        }
+    }
+    exit 0
+}
+
+Ensure-BaseImage
+
+foreach ($currentModule in $TARGET_MODULES) {
+    $GRADLE_TASK = $GRADLE_TASKS[$currentModule]
+    $DOCKERFILE = "docker/scripts/${currentModule}.Dockerfile"
+    $MODULE_IMAGE = "finlumia/${currentModule}:latest"
+    $CONTAINER_PORT = $CONTAINER_PORTS[$currentModule]
+    $HOST_PORT = if ($PROFILE -eq "pro") { $HOST_PORTS_PRO[$currentModule] } else { $HOST_PORTS_DEV[$currentModule] }
+    $CONTAINER_TEST = "test-${currentModule}-${PROFILE}"
+
+    if (-not (Test-Path $DOCKERFILE)) {
+        Write-Host "ERRO: Dockerfile nao encontrado em $DOCKERFILE"
+        exit 1
+    }
+
+    $devContainerRunning = docker ps --format "{{.Names}}" | Where-Object { $_ -eq $DEV_CONTAINER }
+    if ($devContainerRunning) {
+        $execUser = "root"
+        docker exec $DEV_CONTAINER getent passwd finlumia *> $null
+        if ($LASTEXITCODE -eq 0) { $execUser = "finlumia" }
+        docker exec -u $execUser $DEV_CONTAINER bash -lc "./gradlew $GRADLE_TASK --no-daemon -Dspring.profiles.active=$PROFILE"
+    } else {
+        .\gradlew.bat $GRADLE_TASK --no-daemon "-Dspring.profiles.active=$PROFILE"
+    }
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao compilar $currentModule"; exit 1 }
+
+    docker buildx build --load -t $MODULE_IMAGE -f $DOCKERFILE --build-arg SPRING_PROFILE=$PROFILE .
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha no build docker de $currentModule"; exit 1 }
+
+    $OUTPUT_DIR = if ($t) { "docker/test" } else { "docker/build" }
+    if (-not (Test-Path $OUTPUT_DIR)) { New-Item -ItemType Directory -Path $OUTPUT_DIR | Out-Null }
+    $OUTPUT_FILE = "$OUTPUT_DIR/${currentModule}-${PROFILE}.tar"
+
+    docker save -o $OUTPUT_FILE $MODULE_IMAGE
+    if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao salvar imagem $MODULE_IMAGE"; exit 1 }
+
+    if ($t) {
+        $exists = docker ps -a --format "{{.Names}}" | Where-Object { $_ -eq $CONTAINER_TEST }
+        if ($exists) {
+            docker stop $CONTAINER_TEST | Out-Null
+            docker rm $CONTAINER_TEST | Out-Null
+        }
+
+        docker run -d --name $CONTAINER_TEST -p "${HOST_PORT}:${CONTAINER_PORT}" -e "SPRING_PROFILES_ACTIVE=$PROFILE" --restart unless-stopped $MODULE_IMAGE
+        if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao iniciar container $CONTAINER_TEST"; exit 1 }
+    }
+
+    Write-Host "$currentModule | profile=$PROFILE | host=$HOST_PORT | container=$CONTAINER_PORT | image=$MODULE_IMAGE"
+}
+
+if ($t -and -not $all) {
+    docker logs -f "test-${module}-${PROFILE}"
+}

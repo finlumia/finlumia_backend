@@ -21,32 +21,6 @@ import br.com.finlumia.shared.exception.FinlumiaException;
 public class GenericRegisterRepository {
     private final DataSource postgresDataSource;
 
-    private class QueryGeneric {
-
-        public static String GET_DATA_TABLE = """
-                select
-                    tb.tab_schema_name,
-                    tb.tab_table_name,
-                    fd.fie_field_name,
-                    fd.fie_display_order,
-                    fd.fie_data_type
-                from configurator."TAB" tb
-                left join configurator."FIE" fd
-                    on tb.k_e_y = fd.fie_table_key
-                    and fd.d_e_l_e_t_e = false
-                    where tb.tab_slug = ?
-                    and tb.d_e_l_e_t_e = false
-                order by fd.fie_display_order asc
-                    """;
-        public static String GET_ITEN_TABLE = """
-                SELECT
-                    %s
-                from %s.%s
-                LIMIT 50 OFFSET (? - 1) * 50;
-
-                    """;
-    }
-
     protected class DataTable {
         protected String schemaName;
         protected String tableName;
@@ -67,8 +41,33 @@ public class GenericRegisterRepository {
     }
 
     protected DataTable getGenericDataTable(Long keyUser, String slugTable) {
+
+        String sql_get_data_table = """
+            select
+                tb.tab_schema_name,
+                tb.tab_table_name,
+                fd.fie_field_name,
+                fd.fie_display_order,
+                fd.fie_data_type,
+                fd.fie_is_required ,
+                fd.fie_default_value ,
+                fd.fie_sql_script_depara,
+                fd.fie_field_precision, 
+                fd.fie_field_scale 
+            from configurator."TAB" tb
+            left join configurator."FIE" fd
+                on tb.k_e_y = fd.fie_table_key
+                and fd.d_e_l_e_t_e = false
+            where 
+                %s
+                tb.tab_slug = ?
+                and tb.d_e_l_e_t_e = false
+            order by fd.fie_display_order asc
+
+                """;
+
         try (Connection connection = postgresDataSource.getConnection();
-                PreparedStatement preparedStatement = connection.prepareStatement(QueryGeneric.GET_DATA_TABLE)) {
+                PreparedStatement preparedStatement = connection.prepareStatement(sql_get_data_table)) {
             preparedStatement.setString(1, slugTable);
             boolean linhaOne = true;
             ResultSet resultSet = preparedStatement.executeQuery();
@@ -116,15 +115,15 @@ public class GenericRegisterRepository {
         }
     }
 
-    protected GenericListResponse getGenericItemTable(Long keyUser, DataTable dataTable, List<String> listField, String selectFields, int pageSize) {
+    protected GenericListResponse getGenericItemTable(Long keyUser, DataTable dataTable, List<String> listField, String selectFields, int page) {
         try (Connection connection = postgresDataSource.getConnection();
                 PreparedStatement preparedStatement = connection
-                        .prepareStatement(getSelectSql(dataTable, selectFields, pageSize))) {
+                        .prepareStatement(getSelectSql(dataTable, selectFields, page))) {
                 try (ResultSet rs = preparedStatement.executeQuery()) {
                     GenericListResponse genericListResponse = new GenericListResponse();
                     genericListResponse.setTableSlug(dataTable.tableName);
-                    List<GenericListResponse.Linha> linhas = new ArrayList<>();
-                    Long countLine = 1L;
+                    List<GenericListResponse.Linha> listaLinhas = new ArrayList<>();
+                    Long countLine = ((long) (page - 1) * 50) + 1;
                     while (rs.next()) {
                         GenericListResponse.Linha linha = genericListResponse.new Linha();
                         linha.setIdentifier(countLine);
@@ -137,8 +136,13 @@ public class GenericRegisterRepository {
                             columnList.add(column);
                         }
                         linha.setColumn(columnList);
-                        linhas.add(linha);
-                    }   
+                        listaLinhas.add(linha);
+
+                    }
+                    genericListResponse.setLinhas(listaLinhas);
+                    genericListResponse.setPage(page);
+                    genericListResponse.setPageSize(50);
+                    genericListResponse.setTotalElements(listaLinhas.size());
                     return genericListResponse;
                 }
         }catch (FinlumiaException e) {
@@ -146,8 +150,8 @@ public class GenericRegisterRepository {
         } catch (Exception e) {
             throw new FinlumiaException(
                     500,
-                    "Erro ao realizar o insert na tabela",
-                    "[insertGenericLine]: " + e.getMessage());
+                    "Erro ao listar itens da tabela",
+                    "[getGenericItemTable]: " + e.getMessage());
         }
     }
 
@@ -164,7 +168,7 @@ public class GenericRegisterRepository {
                 insertValues);
     }
 
-    private String getSelectSql(DataTable dataTable, String valuesSelect, int pageSize) {
+    private String getSelectSql(DataTable dataTable, String valuesSelect, int page) {
         return """
                 select
                     %s
@@ -175,7 +179,7 @@ public class GenericRegisterRepository {
                 valuesSelect,
                 quoteIdentifier(dataTable.schemaName),
                 quoteIdentifier(dataTable.tableName),
-                pageSize);
+                page);
     }
 
     private String quoteIdentifier(String identifier) {
@@ -187,5 +191,7 @@ public class GenericRegisterRepository {
         }
         return "\"" + identifier + "\"";
     }
+
+
 
 }

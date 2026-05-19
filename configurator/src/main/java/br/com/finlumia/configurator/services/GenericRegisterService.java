@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -45,14 +46,14 @@ public class GenericRegisterService {
 
         // Montar campos da tabela para realizar o insert
         List<String> listFields = new ArrayList<>();
-        StringBuilder selectFieldsBuilder = new StringBuilder("(");
+        StringJoiner selectFieldsJoiner = new StringJoiner(",");
         for (Field field : dataTable.fields.values()) {
             listFields.add(field.fieldName);
-            selectFieldsBuilder.append(field.fieldName).append(",");
+            selectFieldsJoiner.add(field.fieldName);
         }
-        String insertFields = selectFieldsBuilder.substring(0, selectFieldsBuilder.length() - 1) + ")";
+        String selectFields = selectFieldsJoiner.toString();
 
-        return genericRegisterRepository.getGenericItemTable(keyUser, dataTable, listFields, insertFields, 50);
+        return genericRegisterRepository.getGenericItemTable(keyUser, dataTable, listFields, selectFields, request.getPage());
 
     }
 

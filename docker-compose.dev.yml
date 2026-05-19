@@ -1,0 +1,27 @@
+services:
+  dev:
+    image: finlumia/dev:almalinux10
+    container_name: finlumiadev
+    #Fica esperando novas linhas que não serão preenchidas.
+    # tail -> exibe o final do arquivo as 10 últimas linhas
+    # -f -> fica exibindo o que há no tail
+    # /dev/null -> diretório linux onde tudo é deletado
+    command: ["tail", "-f", "/dev/null"]
+    #
+    working_dir: /workspace
+    volumes:
+      # Linux apontando para a pasta onde está o repositório.
+      - .:/workspace
+      # Grava todo o cache para dentro do volume docker
+      - gradle-cache:/home/finlumia/.gradle
+      # Habilita a comunicação docker socket com a máquina server
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "40570:40570"
+    # Container aceita entrada do teclado
+    stdin_open: true
+    # Habilita funcionalidades de terminal como cores, cursor, prompts interativos.
+    tty: true
+
+volumes:
+  gradle-cache:
