@@ -1,164 +1,441 @@
-# Finlumia
+# Finlumia Backend
 
-> Plataforma web de análise de finanças pessoais baseada na importação e processamento de extratos financeiros.
+Backend da plataforma Finlumia, organizado como monorepo Gradle com módulos Spring Boot.
 
----
+Este documento foi estruturado para apoiar onboarding, manutenção e evolução do projeto com segurança, cobrindo:
 
-## Sobre o Projeto
+- visão arquitetural e responsabilidades por módulo;
+- fluxo de chamadas HTTP e camadas internas;
+- subida do ambiente de desenvolvimento;
+- build, empacotamento e subida de containers;
+- boas práticas operacionais e de segurança.
 
-O Finlumia permite que usuários importem arquivos de extratos financeiros ou realizem lançamentos manuais de movimentações, possibilitando o processamento, organização e visualização das transações de forma estruturada, clara e visual por meio de painéis gráficos.
+## Menu de navegação
 
-A plataforma oferece funcionalidades de categorização de transações e filtros de análise para que o usuário compreenda seus padrões de gastos e mantenha o controle de suas finanças pessoais.
-
----
-
-## Problema que Resolve
-
-- Dificuldade em organizar e compreender finanças pessoais
-- Falta de controle sobre despesas recorrentes e uso de crédito
-- Limitação na identificação das áreas de maior impacto financeiro (alimentação, moradia, saúde, etc.)
-- Ausência de uma visão consolidada e estruturada dos hábitos de consumo
-
----
-
-## Benefícios
-
-- Centralização das informações financeiras em um único ambiente
-- Melhor compreensão dos padrões de consumo
-- Identificação das categorias com maior impacto financeiro
-- Apoio na tomada de decisões financeiras conscientes
-- Redução do risco de endividamento descontrolado
-- Visualização clara por meio de painéis gráficos
+- [1) Visão geral do repositório](#1-visão-geral-do-repositório)
+- [2) Fluxo de responsabilidades por camada](#2-fluxo-de-responsabilidades-por-camada)
+- [3) Fluxo de chamadas HTTP (requisição a resposta)](#3-fluxo-de-chamadas-http-requisição-a-resposta)
+- [4) Fluxo entre módulos e documentação (chamadas internas de docs)](#4-fluxo-entre-módulos-e-documentação-chamadas-internas-de-docs)
+- [5) Portas e perfis locais](#5-portas-e-perfis-locais)
+- [6) Subida do ambiente de desenvolvimento (container de desenvolvimento)](#6-subida-do-ambiente-de-desenvolvimento-container-de-desenvolvimento)
+- [7) Rodar módulos sem container (execução Gradle local)](#7-rodar-módulos-sem-container-execução-gradle-local)
+- [8) Build de imagem e subida de containers dos módulos](#8-build-de-imagem-e-subida-de-containers-dos-módulos)
+- [9) Sequência recomendada para onboarding técnico](#9-sequência-recomendada-para-onboarding-técnico)
+- [10) Troubleshooting rápido](#10-troubleshooting-rápido)
+- [11) Boas práticas de manutenção](#11-boas-práticas-de-manutenção)
+- [12) Segurança: pontos obrigatórios](#12-segurança-pontos-obrigatórios)
+- [13) Alinhamento técnico](#13-alinhamento-técnico)
 
 ---
 
-## Público-Alvo
+## 1) Visão geral do repositório
 
-- Pessoas físicas que desejam organizar e controlar suas finanças pessoais
-- Usuários com renda fixa ou variável com dificuldades na gestão de despesas
-- Indivíduos que utilizam múltiplas fontes de pagamento (cartão de crédito, débito, transferências)
-- Usuários com baixo ou médio nível de conhecimento em educação financeira
+Este repositório concentra serviços de backend e bibliotecas compartilhadas.
 
----
+### Módulos atuais (arquivo `settings.gradle`)
 
-## Módulos do Sistema (visão de produto)
+- `shared`: base reutilizável (configurações comuns, exceções, interceptor, segurança utilitária, datasource).
+- `configurator`: API de cadastro/listagem genérica baseada em metadados.
+- `identity`: módulo de identidade (em estrutura inicial).
+- `movement`: módulo de movimentações (em estrutura inicial).
+- `docs`: agregador de documentação (Swagger UI centralizado dos módulos).
 
-### Configurador
+### Responsabilidade de cada módulo na prática
 
-Permite que administradores e desenvolvedores configurem dinamicamente o sistema sem necessidade de deploy. Inclui criação de tabelas, campos, menus, parâmetros globais, triggers, functions, índices, regras visuais e condicionais.
+- `shared`: onde ficam componentes transversais que não pertencem a um domínio específico (interceptors, tratamento global de erro, configuração de infraestrutura).
+- `configurator`: domínio já ativo para operações genéricas de cadastro/listagem.
+- `identity`: base para autenticação/identidade e controles relacionados a usuário (estrutura em evolução).
+- `movement`: base para casos de uso de movimentação/transação (estrutura em evolução).
+- `docs`: porta de entrada para consulta da documentação consolidada de APIs, útil para QA, integração e validação de contratos.
 
-### Identidade
+### Como decidir “em qual módulo mexer”
 
-Gerencia identidade, acesso e ciclo de vida do usuário na plataforma. Inclui cadastro, login, recuperação de senha, gestão de perfil, assinatura e exclusão de conta.
+- se o comportamento é específico de um domínio de negócio, alterar no módulo do domínio;
+- se o comportamento será reutilizado por dois ou mais módulos, migrar/adicionar no `shared`;
+- se a necessidade é somente documentação e descoberta de endpoints, alterar no `docs`.
 
-### Movimentações
+### Stack técnica
 
-Permite ao usuário registrar e gerenciar suas transações financeiras com suporte a categorias personalizadas, filtros, movimentações recorrentes e saldo consolidado.
-
-### Analítico
-
-Transforma dados financeiros em insights visuais com dashboards, gráficos (pizza, linha, barra), KPIs, filtros dinâmicos, comparação de períodos e exportação de relatórios.
-
-### Pagamento
-
-Gerencia planos, assinaturas e integração com gateway de pagamento (Stripe ou Mercado Pago) com suporte a webhooks e notificações ao usuário.
-
-### Documentação
-
-Disponibiliza conhecimento e suporte para uso da plataforma, tanto para usuários finais quanto para desenvolvedores.
-
----
-
-## Este repositório: `finlumia_backend`
-
-Monorepo **Gradle** com serviços **Spring Boot** em Java. Neste repositório estão, hoje, os módulos de backend abaixo; outros módulos de produto (analítico, pagamento, etc.) podem residir em outros repositórios ou ser incorporados futuramente.
-
-| Módulo Gradle        | Papel |
-|----------------------|--------|
-| `shared`             | Biblioteca compartilhada: Spring Web MVC, Security, OAuth2 Client, JDBC, validação, OpenAPI (Springdoc), exceções e DTOs comuns (ex.: `DialogDefault`). |
-| `configurator`       | API do configurador: metadados de tabelas e campos no PostgreSQL, geração física de `CREATE TABLE` / `ALTER TABLE ... ADD COLUMN` a partir do configurador. |
-| `identity`           | Serviço de identidade (sobre `shared`). |
-| `movement`           | Serviço de movimentações (sobre `shared`). |
-
-**Stack principal:** Java 21, Spring Boot 4.0.x, PostgreSQL (driver JDBC), Lombok.
+- Java 21
+- Spring Boot 4.0.5
+- Gradle multi-módulo
+- PostgreSQL (acesso JDBC)
+- Lombok
+- Docker/Buildx para empacotamento e execução em container
 
 ---
 
-## Arquitetura do backend
+## 2) Fluxo de responsabilidades por camada
 
-### Organização em camadas
+Nos módulos de aplicação, o padrão esperado é:
 
-Nos módulos de aplicação (por exemplo `configurator`), o código segue separação em:
+- `controllers`: recebem requisições HTTP, validam contrato e delegam para serviços;
+- `services`: centralizam regras de negócio, orquestração e decisões de domínio;
+- `repositories`: executam acesso a dados e consultas SQL;
+- `models` e `views`: definem contratos de entrada e saída;
+- `shared`: concentra infraestrutura e comportamentos comuns a todos os módulos.
 
-1. **Controllers** — REST, validação de entrada (`jakarta.validation`), cabeçalhos (ex.: `X-Key-User`), respostas HTTP com `DialogDefault` quando aplicável.
-2. **Services** — regras de negócio, orquestração e montagem de DDL dinâmico onde necessário.
-3. **Repositories** — acesso a dados via `DataSource` (JDBC), `PreparedStatement`, transações quando exigido.
-4. **SQL estático** — classes `*Sql` em `repository.sql` concentram strings de consulta e fragmentos de DDL reutilizáveis; comandos que dependem de colunas geradas dinamicamente permanecem montados no serviço.
+Exemplo real no projeto (`configurator`):
 
-### Configurador: fluxo de metadados e banco físico
+- `configurator/src/main/java/br/com/finlumia/configurator/controllers`
+- `configurator/src/main/java/br/com/finlumia/configurator/services`
+- `configurator/src/main/java/br/com/finlumia/configurator/models`
+- `configurator/src/main/java/br/com/finlumia/configurator/views`
 
-- Metadados de **tabelas** e **campos** persistidos em esquema `configurator` no PostgreSQL.
-- Endpoints REST sob prefixo `/api/configurator` (tabelas, campos, sincronização física).
-- **Criação física de tabelas:** serviço lê tabelas pendentes, monta `CREATE SCHEMA` / `CREATE TABLE` / índices conforme campos configurados e atualiza flags no configurador.
-- **Criação física de colunas:** para tabelas já materializadas, o serviço compara o catálogo (`pg_catalog`) com os campos do configurador e executa `ALTER TABLE ... ADD COLUMN` (e índices quando configurado).
+### Regra prática para manutenção
 
-### Dados e segurança
+- mudança de rota/contrato: ajustar `controller` + `model/view`;
+- mudança de regra de negócio: ajustar `service`;
+- mudança de persistência/consulta: ajustar `repository`;
+- regra transversal (usada por mais de um módulo): avaliar inclusão em `shared`.
 
-- Conexão JDBC qualificada (`postgresDataSource`) para o PostgreSQL de aplicação.
-- Spring Security e OAuth2 Client disponíveis via `shared` (detalhes de proteção de endpoints por módulo evoluem com o projeto).
+### Fronteira de responsabilidades (evitar acoplamento)
 
-### Diretrizes alinhadas ao produto
-
-- Arquitetura modular com separação entre regras de negócio e configuração.
-- Configuração dinâmica de entidades (tabelas, campos, parâmetros) com caminho para evolução sem redeploy completo da modelagem de dados.
-- Estrutura preparada para versionamento e evolução incremental.
-- Suporte conceitual a menus configuráveis e hierárquicos.
-- Preparado para pipeline de dados futuro (Airflow / PySpark), conforme roadmap.
-
----
-
-## Modelo de Negócio
-
-| Plano | Preço | Recursos |
-|-------|--------|----------|
-| **Free** | Gratuito | Importação de até 3 extratos, até 200 movimentações manuais, dashboard básico |
-| **Pro** | R$ 19–29/mês | Extratos e movimentações ilimitados, insights automáticos, relatórios |
-| **Premium** | Em breve | IA financeira e previsões |
+- `controller` não deve conter regra de negócio complexa;
+- `service` não deve conhecer detalhes de HTTP (headers, status code, etc.);
+- `repository` não deve decidir regra de negócio;
+- contratos (`models/views`) devem ser claros, estáveis e versionáveis quando necessário.
 
 ---
 
-## Conformidade Legal
+## 3) Fluxo de chamadas HTTP (requisição a resposta)
 
-- **LGPD** — Consentimento, direito à exclusão e portabilidade de dados
-- **Código de Defesa do Consumidor** — Transparência na cobrança e cancelamento facilitado
-- **Marco Civil da Internet** — Registro de logs
-- **GDPR** — Preparado para expansão internacional
+Fluxo simplificado de uma chamada para o módulo `configurator`:
+
+1. O cliente chama um endpoint em `/api/configurator/**`.
+2. O `KeyUserInterceptor` (no módulo `shared`) intercepta rotas `/api/**` e resolve o contexto `keyUser`.
+3. O `Controller` valida o payload e encaminha para o `Service`.
+4. O `Service` aplica as regras de negócio e chama o `Repository`.
+5. O `Repository` usa o `DataSource` configurado em `shared` para consultar/escrever no PostgreSQL.
+6. A resposta retorna ao cliente no formato definido em `views`/DTOs.
+7. Em caso de erro, o `GlobalExceptionHandler` padroniza o retorno com base em `FinlumiaException`.
+
+### O que observar em cada etapa do fluxo
+
+- **Entrada HTTP (`controller`)**: validar payload, mapear campos obrigatórios e garantir contrato consistente.
+- **Contexto de segurança (`KeyUserInterceptor`)**: garantir leitura e validação de `keyUser` para rotas sob `/api/**`.
+- **Regra de negócio (`service`)**: garantir consistência de domínio, evitando regra duplicada em outros pontos.
+- **Persistência (`repository`)**: manter consultas claras, seguras e fáceis de manter.
+- **Resposta e exceções**: padronizar erros para facilitar observabilidade, suporte e consumo por front-end/integrações.
+
+### Checklist de alteração por endpoint
+
+1. Validar se o endpoint fica em `/api/**` e exige `keyUser`.
+2. Confirmar contrato de request e response.
+3. Implementar/ajustar regra de negócio no `service`.
+4. Revisar impacto em consulta/persistência.
+5. Validar retorno de erro padronizado em cenários de falha.
+6. Atualizar documentação no módulo `docs`, quando aplicável.
+
+### Exemplo de endpoints já existentes (`configurator`)
+
+Base: `/api/configurator`
+
+- `POST /generic_register`
+- `POST /generic_list`
 
 ---
 
-## Métricas de Negócio
+## 4) Fluxo entre módulos e documentação (chamadas internas de docs)
 
-- **MRR** — Receita Recorrente Mensal
-- **Churn** — Taxa de cancelamento
-- **LTV** — Lifetime Value
-- **CAC** — Custo de Aquisição de Cliente
+O módulo `docs` centraliza visualização de APIs em `http://localhost:40574/docs/swagger-ui.html`.
+
+Ele consulta os endpoints de documentação de cada serviço:
+
+- `configurator`: `http://localhost:40571/internal/docs/api-docs`
+- `identity`: `http://localhost:40572/internal/docs/api-docs`
+- `movement`: `http://localhost:40573/internal/docs/api-docs`
+- `docs`: `http://localhost:40574/v3/api-docs`
+
+Se algum serviço não subir, o Swagger agregador pode apresentar falhas parciais de carregamento.
+
+### Dependência operacional do módulo `docs`
+
+Para visualizar toda a documentação agregada, o `docs` depende de:
+
+- `docs` ativo na porta `40574`;
+- módulos de negócio ativos nas portas esperadas (`40571`, `40572`, `40573`);
+- endpoints de docs internos acessíveis (`/internal/docs/api-docs`).
+
+Se um módulo estiver fora do ar, o Swagger pode continuar abrindo, mas com falha no carregamento da API específica.
 
 ---
 
-## Desenvolvimento local
+## 5) Portas e perfis locais
 
-Pré-requisitos: JDK 21, Gradle Wrapper (incluído no repositório), PostgreSQL acessível conforme configuração do ambiente.
+Cada aplicação roda de forma independente:
 
-```bash
-# compilar todos os módulos
-./gradlew build
+- `configurator`: `40571`
+- `identity`: `40572`
+- `movement`: `40573`
+- `docs`: `40574`
+- ambiente de desenvolvimento (`dev container`): `40570`
 
-# exemplo: compilar apenas o configurador
-./gradlew :configurator:compileJava
+Os perfis suportados pelos scripts são:
+
+- `dev`: desenvolvimento local;
+- `pro`: perfil de empacotamento/distribuição.
+
+---
+
+## 6) Subida do ambiente de desenvolvimento (container de desenvolvimento)
+
+O ambiente de desenvolvimento usa `docker-compose.dev.yml`, com:
+
+- container `finlumiadev`;
+- volume do repositório montado em `/workspace`;
+- cache Gradle persistido em volume Docker;
+- Docker socket montado para permitir build de imagens de dentro do container.
+
+### Quando usar o dev container
+
+Use o ambiente `finlumiadev` quando você quiser:
+
+- padronizar o ambiente entre desenvolvedores;
+- reduzir diferenças de versão entre máquinas locais;
+- executar build Docker/Gradle em contexto controlado;
+- evitar instalação manual de dependências na máquina host.
+
+### Pré-requisitos
+
+- Docker Desktop ativo;
+- permissão para uso do Docker;
+- arquivo de imagem base: `docker/bases/finlumia-dev-almalinux10.tar`.
+
+### Opção A: usando script (Windows PowerShell)
+
+```powershell
+.\finlumiadev.ps1 -up
 ```
 
-Cada módulo `configurator`, `identity` e `movement` é uma aplicação Spring Boot independente; variáveis de conexão e perfis devem ser definidos em `application` properties ou variáveis de ambiente do seu ambiente.
+Fluxo recomendado:
 
-Rodar o projeto localmente
+1. subir ambiente (`-up`);
+2. validar estado (`-status`);
+3. entrar no shell (`-shell`) para build/testes;
+4. acompanhar logs (`-logs`) quando necessário;
+5. encerrar ambiente (`-down`) ao finalizar.
 
-./gradlew :configurator:bootRun
+Comandos disponíveis:
+
+- `-up`: sobe o ambiente;
+- `-rebuild`: recria containers;
+- `-shell`: entra no container (`bash` como usuário `finlumia`);
+- `-down`: remove o ambiente;
+- `-status`: lista status dos serviços;
+- `-logs`: acompanha logs em tempo real.
+
+Exemplos:
+
+```powershell
+.\finlumiadev.ps1 -status
+.\finlumiadev.ps1 -shell
+```
+
+### Opção B: usando Docker Compose diretamente
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml down
+```
+
+### Verificação rápida pós-subida
+
+- confirmar container `finlumiadev` em execução;
+- testar acesso ao shell do container;
+- validar se o diretório `/workspace` contém o código do projeto;
+- confirmar se comandos Docker funcionam dentro do container (quando necessário build de imagens).
+
+---
+
+## 7) Rodar módulos sem container (execução Gradle local)
+
+### Pré-requisitos
+
+- JDK 21 instalado e configurado no `PATH`;
+- PostgreSQL acessível com configurações compatíveis ao perfil;
+- Gradle Wrapper do projeto (`gradlew`/`gradlew.bat`).
+
+### Build completo de todos os módulos
+
+Linux/macOS:
+
+```bash
+./gradlew build
+```
+
+Windows PowerShell:
+
+```powershell
+.\gradlew.bat build
+```
+
+### Subir módulo específico com perfil `dev`
+
+Linux/macOS:
+
+```bash
+./gradlew :configurator:bootRun -Dspring.profiles.active=dev
+```
+
+Windows PowerShell:
+
+```powershell
+.\gradlew.bat :configurator:bootRun "-Dspring.profiles.active=dev"
+```
+
+### Quando preferir execução local sem container
+
+- depuração com breakpoints diretamente na IDE;
+- testes rápidos em um único módulo;
+- ajustes pontuais de código com ciclo curto de feedback.
+
+---
+
+## 8) Build de imagem e subida de containers dos módulos
+
+O script `finlumia.ps1` (Windows) e `finlumia.sh` (Linux/macOS) automatiza:
+
+- build do `bootJar` por módulo;
+- build da imagem Docker com Buildx;
+- exportação da imagem para `.tar`;
+- subida de container de teste quando usado modo `-t`.
+
+### Diferença entre `-t` e `-c`
+
+- `-t` (teste): ideal para validação funcional em container local, pois inicia container automaticamente.
+- `-c` (distribuição): ideal para gerar artefato `.tar` da imagem sem executar container.
+
+### Sintaxe principal
+
+Windows:
+
+```powershell
+.\finlumia.ps1 <modulo>|-all -t|-c -dev|-pro [-s]
+```
+
+Linux/macOS:
+
+```bash
+./finlumia.sh <modulo>|-all -t|-c -dev|-pro [-s]
+```
+
+Parâmetros:
+
+- `<modulo>`: `configurator`, `identity`, `movement` ou `docs`;
+- `-all`: processa todos os módulos;
+- `-t`: modo teste (sobe container automaticamente);
+- `-c`: modo distribuição (gera artefato, sem subir container);
+- `-dev` ou `-pro`: define perfil;
+- `-s`: remove container de teste (somente com `-t`).
+
+### Exemplos de uso
+
+Subir container de teste do `configurator` em `dev`:
+
+```powershell
+.\finlumia.ps1 configurator -t -dev
+```
+
+Gerar artefatos de todos os módulos para distribuição em `pro`:
+
+```powershell
+.\finlumia.ps1 -all -c -pro
+```
+
+Remover container de teste do `configurator` em `dev`:
+
+```powershell
+.\finlumia.ps1 configurator -t -dev -s
+```
+
+### Nomes e saídas geradas
+
+- imagem do módulo: `finlumia/<modulo>:latest`;
+- container de teste: `test-<modulo>-<profile>`;
+- arquivos `.tar`:
+  - teste: `docker/test/<modulo>-<profile>.tar`;
+  - distribuição: `docker/build/<modulo>-<profile>.tar`.
+
+### Fluxo operacional recomendado para release técnica
+
+1. gerar imagem em `-t -dev` e validar comportamento local;
+2. revisar logs do container e endpoints críticos;
+3. gerar artefato final com `-c -pro`;
+4. armazenar/publicar artefato conforme processo interno da equipe.
+
+---
+
+## 9) Sequência recomendada para onboarding técnico
+
+1. Subir ambiente dev (`finlumiadev.ps1 -up`).
+2. Entrar no container (`finlumiadev.ps1 -shell`), quando necessário.
+3. Executar build (`gradlew build`) e validar compilação.
+4. Subir um módulo em `-t -dev` para validar endpoint.
+5. Subir `docs` para validar se os `api-docs` dos módulos estão acessíveis.
+6. Acompanhar logs do módulo em execução.
+
+---
+
+## 10) Troubleshooting rápido
+
+- erro de imagem base ausente: validar arquivos em `docker/bases/*.tar`;
+- erro de porta em uso: verificar processos ocupando `40570-40574`;
+- erro de docs sem endpoints: confirmar se os módulos referenciados estão ativos;
+- erro de banco: revisar variáveis/propriedades de conexão do perfil em uso;
+- erro no Docker dentro do dev container: validar montagem de `/var/run/docker.sock`.
+
+### Diagnóstico sugerido (ordem prática)
+
+1. Validar se o container/serviço subiu (`status`/`ps`).
+2. Validar logs (`logs`) e identificar o primeiro erro relevante.
+3. Validar portas ocupadas e conflitos locais.
+4. Validar perfil ativo (`dev` ou `pro`) e variáveis associadas.
+5. Reexecutar build limpo após correção.
+
+---
+
+## 11) Boas práticas de manutenção
+
+### Antes de codar
+
+- ler `controller`, `service` e `repository` do fluxo impactado;
+- identificar se a responsabilidade é local do módulo ou compartilhada;
+- validar impacto em request/response e em contratos de consumidores.
+
+### Durante a implementação
+
+- manter separação de responsabilidades por camada;
+- validar entradas com anotações (`@NotNull`, `@NotBlank`, etc.);
+- evitar SQL concatenado com dados de usuário;
+- padronizar erros com exceções de domínio e handler global.
+
+### Antes de abrir PR
+
+- executar build local;
+- testar endpoints alterados (Postman/Insomnia/cURL);
+- revisar logs e mensagens de erro;
+- atualizar este README em caso de alteração de fluxo operacional.
+
+---
+
+## 12) Segurança: pontos obrigatórios
+
+- não versionar credenciais reais em `application*.properties`;
+- priorizar variáveis de ambiente para usuário, senha e chaves;
+- restringir documentação interna em ambientes produtivos;
+- revisar autenticação/autorização ao expor novas rotas;
+- não confiar em headers do cliente sem validação de contexto.
+
+Ao criar endpoints em `/api/**`, validar explicitamente o tratamento de `keyUser` e os critérios de autorização associados.
+
+---
+
+## 13) Alinhamento técnico
+
+Em caso de dúvida de implementação:
+
+- consultar primeiro este README e o módulo `shared`;
+- alinhar com o responsável técnico do domínio;
+- registrar decisões arquiteturais relevantes para facilitar o onboarding futuro.
