@@ -1,6 +1,91 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+COMPOSE_FILE="docker-compose.dev.yml"
+DB_CONTAINER="finlumiadb"
+DB_IMAGE="finlumia/db:postgres18"
+DB_HOST_PORT="28079"
+DB_VOLUME_SUFFIX="finlumia-postgres-data"
+
+remove_db_volumes() {
+  local volume_name=""
+
+  while IFS= read -r volume_name; do
+    if [ -n "$volume_name" ]; then
+      echo "Removendo volume: $volume_name"
+      docker volume rm "$volume_name" >/dev/null
+    fi
+  done < <(docker volume ls --format '{{.Name}}' | grep "${DB_VOLUME_SUFFIX}$" || true)
+}
+
+restart_finlumia_db() {
+  local reset_data="${1:-false}"
+
+  if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "ERRO: arquivo $COMPOSE_FILE nao encontrado."
+    exit 1
+  fi
+
+  if docker ps -a --format "{{.Names}}" | grep -qx "$DB_CONTAINER"; then
+    echo "Parando container: $DB_CONTAINER"
+    docker stop "$DB_CONTAINER" >/dev/null 2>&1 || true
+    echo "Removendo container: $DB_CONTAINER"
+    docker rm "$DB_CONTAINER" >/dev/null
+  fi
+
+  if [ "$reset_data" = true ]; then
+    remove_db_volumes
+  fi
+
+  if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$DB_IMAGE"; then
+    echo "Removendo imagem: $DB_IMAGE"
+    docker rmi "$DB_IMAGE" >/dev/null
+  fi
+
+  echo "Construindo imagem do banco..."
+  docker compose -f "$COMPOSE_FILE" build db
+
+  echo "Subindo container do banco..."
+  docker compose -f "$COMPOSE_FILE" up -d db
+
+  echo "Aguardando banco ficar saudavel..."
+  for _ in $(seq 1 30); do
+    if docker inspect --format='{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null | grep -qx "healthy"; then
+      if [ "$reset_data" = true ]; then
+        echo "Banco finlumia | container=$DB_CONTAINER | image=$DB_IMAGE | port=$DB_HOST_PORT | status=healthy | reset=sim"
+      else
+        echo "Banco finlumia | container=$DB_CONTAINER | image=$DB_IMAGE | port=$DB_HOST_PORT | status=healthy | reset=nao"
+      fi
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "AVISO: container iniciado, mas healthcheck ainda nao reportou healthy."
+  docker compose -f "$COMPOSE_FILE" ps db
+}
+
+if [ "${1:-}" = "bd" ]; then
+  RESET_DATA=false
+
+  if [ $# -eq 1 ]; then
+    restart_finlumia_db "$RESET_DATA"
+    exit 0
+  fi
+
+  if [ $# -eq 2 ] && [ "${2:-}" = "-reset" ]; then
+    RESET_DATA=true
+    restart_finlumia_db "$RESET_DATA"
+    exit 0
+  fi
+
+  echo "ERRO: use ./finlumia.sh bd ou ./finlumia.sh bd -reset"
+  exit 1
+fi
+
 FLAG_T=false
 FLAG_C=false
 FLAG_S=false
@@ -10,7 +95,8 @@ FLAG_ALL=false
 MODULE=""
 
 if [ $# -eq 0 ]; then
-  echo "Uso: ./finlumia.sh <modulo>|-all [-t|-c] [-pro|-dev] [-s]"
+  echo "Uso: ./finlumia.sh bd [-reset]"
+  echo "     ./finlumia.sh <modulo>|-all [-t|-c] [-pro|-dev] [-s]"
   exit 1
 fi
 
@@ -33,32 +119,32 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-BASE_IMAGE="finlumia/base:almalinux10-zulu21"
-BASE_IMAGE_TAR="docker/bases/finlumia-base-almalinux10-zulu21.tar"
+BASE_IMAGE="finlumia/base:finlumia-dev-almalinux10module_java21"
+BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10module_java21.tar"
 DEV_CONTAINER="finlumiadev"
-VALID_MODULES="configurator identity movement docs"
+VALID_MODULES="configurator identify movement docs"
 
 declare -A HOST_PORTS_DEV=(
-  ["configurator"]=40571
-  ["identity"]=40572
-  ["movement"]=40573
-  ["docs"]=40574
+  ["configurator"]=28081
+  ["identify"]=28083
+  ["movement"]=28084
+  ["docs"]=28082
 )
 declare -A HOST_PORTS_PRO=(
-  ["configurator"]=40571
-  ["identity"]=40572
-  ["movement"]=40573
-  ["docs"]=40574
+ ["configurator"]=28081
+  ["identify"]=28083
+  ["movement"]=28084
+  ["docs"]=28082
 )
 declare -A CONTAINER_PORTS=(
-  ["configurator"]=40571
-  ["identity"]=40572
-  ["movement"]=40573
-  ["docs"]=40574
+  ["configurator"]=28081
+  ["identify"]=28083
+  ["movement"]=28084
+  ["docs"]=28082
 )
 declare -A GRADLE_TASKS=(
   ["configurator"]=":configurator:bootJar"
-  ["identity"]=":identity:bootJar"
+  ["identify"]=":identify:bootJar"
   ["movement"]=":movement:bootJar"
   ["docs"]=":docs:bootJar"
 )
@@ -133,6 +219,16 @@ resolve_exec_user() {
   fi
 }
 
+prepare_gradle_env() {
+  local container_name="$1"
+  docker exec "$container_name" bash -c "
+    mkdir -p /workspace/.gradle
+    chown -R finlumia:finlumia /home/finlumia/.gradle /workspace/.gradle
+    find /workspace -maxdepth 3 -name 'build' -type d \
+      -exec chown -R finlumia:finlumia {} + 2>/dev/null || true
+  "
+}
+
 for CURRENT_MODULE in $TARGET_MODULES; do
   GRADLE_TASK="${GRADLE_TASKS[$CURRENT_MODULE]}"
   DOCKERFILE="docker/scripts/${CURRENT_MODULE}.Dockerfile"
@@ -152,6 +248,7 @@ for CURRENT_MODULE in $TARGET_MODULES; do
 
   if docker ps --format "{{.Names}}" | grep -qx "$DEV_CONTAINER"; then
     EXEC_USER="$(resolve_exec_user "$DEV_CONTAINER")"
+    prepare_gradle_env "$DEV_CONTAINER"
     docker exec -u "$EXEC_USER" "$DEV_CONTAINER" bash -lc "./gradlew $GRADLE_TASK --no-daemon -Dspring.profiles.active=$PROFILE"
   else
     ./gradlew "$GRADLE_TASK" --no-daemon "-Dspring.profiles.active=$PROFILE"

@@ -3,7 +3,7 @@ package br.com.finlumia.docs;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"br.com.finlumia.docs", "br.com.finlumia.shared"})
 public class DocsApplication {
     public static void main(String[] args) {
         SpringApplication.run(DocsApplication.class, args);

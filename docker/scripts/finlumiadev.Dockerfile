@@ -53,9 +53,11 @@ RUN rm -rf \
     /tmp/* \
     /root/.bash_history
 
-RUN useradd -m -s /bin/bash finlumia
+RUN useradd -m -s /bin/bash finlumia \
+    && mkdir -p /home/finlumia/.gradle \
+    && chown -R finlumia:finlumia /home/finlumia
 
-EXPOSE 40570
+EXPOSE 28080
 
 CMD ["tail", "-f", "/dev/null"]
 

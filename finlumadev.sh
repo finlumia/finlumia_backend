@@ -15,8 +15,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 COMPOSE_FILE="docker-compose.dev.yml"
-BASE_IMAGE="finlumia/dev:almalinux10"
-BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10.tar"
+BASE_IMAGE="finlumia/dev:almalinux10module_java21"
+BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10module_java21.tar"
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "ERRO: arquivo $COMPOSE_FILE nao encontrado."

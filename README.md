@@ -34,25 +34,38 @@ Este repositório concentra serviços de backend e bibliotecas compartilhadas.
 
 ### Módulos atuais (arquivo `settings.gradle`)
 
-- `shared`: base reutilizável (configurações comuns, exceções, interceptor, segurança utilitária, datasource).
-- `configurator`: API de cadastro/listagem genérica baseada em metadados.
-- `identity`: módulo de identidade (em estrutura inicial).
-- `movement`: módulo de movimentações (em estrutura inicial).
-- `docs`: agregador de documentação (Swagger UI centralizado dos módulos).
+Monorepo de **microserviços** com **banco monolítico** (PostgreSQL único; cada módulo = schema homônimo).
 
-### Responsabilidade de cada módulo na prática
+| Módulo | Executável | Schema DB | Porta dev |
+|--------|------------|-----------|-----------|
+| `configurator` | sim | `configurator` | 28081 |
+| `docs` | sim | — | 28082 |
+| `identify` | sim | `identify` | 28083 |
+| `movement` | sim | `movement` | 28084 |
+| `shared` | **não** (biblioteca) | — | — |
 
-- `shared`: onde ficam componentes transversais que não pertencem a um domínio específico (interceptors, tratamento global de erro, configuração de infraestrutura).
-- `configurator`: domínio já ativo para operações genéricas de cadastro/listagem.
-- `identity`: base para autenticação/identidade e controles relacionados a usuário (estrutura em evolução).
-- `movement`: base para casos de uso de movimentação/transação (estrutura em evolução).
-- `docs`: porta de entrada para consulta da documentação consolidada de APIs, útil para QA, integração e validação de contratos.
+- `shared`: apenas classes genéricas (`FinlumiaException`, `DialogDefault`, `GlobalExceptionHandler`) e `shared.properties` (datasource comum).
+- Demais módulos: segurança, interceptors, OpenAPI e JDBC ficam **no próprio módulo**.
+
+### Estrutura de pacotes (cada microserviço)
+
+```
+br.com.finlumia.<modulo>/
+  controllers/
+    internal/   → /internal/<modulo>/**  (service-to-service)
+    external/   → /api/<modulo>/**       (clientes)
+  models/
+  services/
+  repositorys/
+  views/
+  config/       → beans Spring (não é domínio de negócio)
+```
 
 ### Como decidir “em qual módulo mexer”
 
-- se o comportamento é específico de um domínio de negócio, alterar no módulo do domínio;
-- se o comportamento será reutilizado por dois ou mais módulos, migrar/adicionar no `shared`;
-- se a necessidade é somente documentação e descoberta de endpoints, alterar no `docs`.
+- regra ou endpoint de um domínio: no módulo do domínio (`configurator`, `identify`, `movement`);
+- contrato HTTP genérico de erro: `shared`;
+- agregação Swagger: `docs`.
 
 ### Stack técnica
 
@@ -69,25 +82,18 @@ Este repositório concentra serviços de backend e bibliotecas compartilhadas.
 
 Nos módulos de aplicação, o padrão esperado é:
 
-- `controllers`: recebem requisições HTTP, validam contrato e delegam para serviços;
-- `services`: centralizam regras de negócio, orquestração e decisões de domínio;
-- `repositories`: executam acesso a dados e consultas SQL;
-- `models` e `views`: definem contratos de entrada e saída;
-- `shared`: concentra infraestrutura e comportamentos comuns a todos os módulos.
-
-Exemplo real no projeto (`configurator`):
-
-- `configurator/src/main/java/br/com/finlumia/configurator/controllers`
-- `configurator/src/main/java/br/com/finlumia/configurator/services`
-- `configurator/src/main/java/br/com/finlumia/configurator/models`
-- `configurator/src/main/java/br/com/finlumia/configurator/views`
+- `controllers/internal` e `controllers/external`: endpoints internos vs públicos;
+- `services`: regras de negócio, filtros JWT (identify), token interno, interceptors;
+- `repositorys`: JDBC no schema do módulo (`identify.users`, etc.);
+- `models` / `views`: entrada e saída HTTP;
+- `shared`: somente exceção/resposta padrão compartilhada.
 
 ### Regra prática para manutenção
 
-- mudança de rota/contrato: ajustar `controller` + `model/view`;
-- mudança de regra de negócio: ajustar `service`;
-- mudança de persistência/consulta: ajustar `repository`;
-- regra transversal (usada por mais de um módulo): avaliar inclusão em `shared`.
+- mudança de rota/contrato: `controllers` + `models` / `views`;
+- mudança de regra de negócio: `services`;
+- mudança de SQL: `repositorys` (schema = nome do módulo);
+- **não** colocar segurança, datasource ou interceptors no `shared`.
 
 ### Fronteira de responsabilidades (evitar acoplamento)
 
@@ -103,10 +109,10 @@ Exemplo real no projeto (`configurator`):
 Fluxo simplificado de uma chamada para o módulo `configurator`:
 
 1. O cliente chama um endpoint em `/api/configurator/**`.
-2. O `KeyUserInterceptor` (no módulo `shared`) intercepta rotas `/api/**` e resolve o contexto `keyUser`.
+2. O `KeyUserInterceptor` (em cada módulo de API) intercepta rotas `/api/**` e resolve o contexto `keyUser`.
 3. O `Controller` valida o payload e encaminha para o `Service`.
 4. O `Service` aplica as regras de negócio e chama o `Repository`.
-5. O `Repository` usa o `DataSource` configurado em `shared` para consultar/escrever no PostgreSQL.
+5. O `repository` do módulo usa o `DataSource` local e o schema homônimo no PostgreSQL.
 6. A resposta retorna ao cliente no formato definido em `views`/DTOs.
 7. Em caso de erro, o `GlobalExceptionHandler` padroniza o retorno com base em `FinlumiaException`.
 
@@ -143,7 +149,7 @@ O módulo `docs` centraliza visualização de APIs em `http://localhost:40574/do
 Ele consulta os endpoints de documentação de cada serviço:
 
 - `configurator`: `http://localhost:40571/internal/docs/api-docs`
-- `identity`: `http://localhost:40572/internal/docs/api-docs`
+- `identify`: `http://localhost:28083/internal/docs/api-docs`
 - `movement`: `http://localhost:40573/internal/docs/api-docs`
 - `docs`: `http://localhost:40574/v3/api-docs`
 
@@ -166,7 +172,7 @@ Se um módulo estiver fora do ar, o Swagger pode continuar abrindo, mas com falh
 Cada aplicação roda de forma independente:
 
 - `configurator`: `40571`
-- `identity`: `40572`
+- `identify`: `28083`
 - `movement`: `40573`
 - `docs`: `40574`
 - ambiente de desenvolvimento (`dev container`): `40570`
@@ -202,7 +208,15 @@ Use o ambiente `finlumiadev` quando você quiser:
 - permissão para uso do Docker;
 - arquivo de imagem base: `docker/bases/finlumia-dev-almalinux10.tar`.
 
-### Opção A: usando script (Windows PowerShell)
+### Opção A: usando script
+
+Linux/macOS:
+
+```bash
+./finlumiadev.sh -up
+```
+
+Windows PowerShell:
 
 ```powershell
 .\finlumiadev.ps1 -up
@@ -225,11 +239,17 @@ Comandos disponíveis:
 - `-status`: lista status dos serviços;
 - `-logs`: acompanha logs em tempo real.
 
-Exemplos:
+Exemplos (bash ou PowerShell, mesmos flags):
 
-```powershell
-.\finlumiadev.ps1 -status
-.\finlumiadev.ps1 -shell
+```bash
+./finlumiadev.sh -status
+./finlumiadev.sh -shell
+```
+
+Validação automatizada dos scripts de build:
+
+```bash
+./scripts/validate-exec-scripts.sh
 ```
 
 ### Opção B: usando Docker Compose diretamente
@@ -323,7 +343,7 @@ Linux/macOS:
 
 Parâmetros:
 
-- `<modulo>`: `configurator`, `identity`, `movement` ou `docs`;
+- `<modulo>`: `configurator`, `identify`, `movement` ou `docs`;
 - `-all`: processa todos os módulos;
 - `-t`: modo teste (sobe container automaticamente);
 - `-c`: modo distribuição (gera artefato, sem subir container);

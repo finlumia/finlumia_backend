@@ -20,11 +20,19 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .anyRequest().hasRole("ADMIN"))
+                        .requestMatchers(
+                                "/docs/swagger-ui.html",
+                                "/docs/swagger-ui/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                DocsOpenApiPaths.PUBLIC_API_DOCS_PREFIX + "/**")
+                        .permitAll()
+                        .requestMatchers("/docs/admin/**")
+                        .hasRole("ADMIN")
+                        .anyRequest().permitAll())
                 .httpBasic(httpBasic -> {
                 })
-                .formLogin(formLogin -> {
-                });
+                .formLogin(formLogin -> formLogin.disable());
 
         return http.build();
     }

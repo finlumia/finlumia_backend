@@ -12,39 +12,39 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$BASE_IMAGE = "finlumia/base:almalinux10-zulu21"
-$BASE_IMAGE_TAR = "docker/bases/finlumia-base-almalinux10-zulu21.tar"
+$BASE_IMAGE = "finlumia/base:finlumia-dev-almalinux10module_java21"
+$BASE_IMAGE_TAR = "docker/bases/finlumia-dev-almalinux10module_java21.tar"
 $DEV_CONTAINER = "finlumiadev"
 
 $HOST_PORTS_DEV = @{
-    "configurator" = 40571
-    "identity" = 40572
-    "movement" = 40573
-    "docs" = 40574
+    "configurator" = 28081
+    "identify"     = 28083
+    "movement"     = 28084
+    "docs"         = 28082
 }
 
 $HOST_PORTS_PRO = @{
-    "configurator" = 40571
-    "identity" = 40572
-    "movement" = 40573
-    "docs" = 40574
+    "configurator" = 28081
+    "identify"     = 28083
+    "movement"     = 28084
+    "docs"         = 28082
 }
 
 $CONTAINER_PORTS = @{
-    "configurator" = 40571
-    "identity" = 40572
-    "movement" = 40573
-    "docs" = 40574
+    "configurator" = 28081
+    "identify"     = 28083
+    "movement"     = 28084
+    "docs"         = 28082
 }
 
 $GRADLE_TASKS = @{
     "configurator" = ":configurator:bootJar"
-    "identity" = ":identity:bootJar"
+    "identify" = ":identify:bootJar"
     "movement" = ":movement:bootJar"
     "docs" = ":docs:bootJar"
 }
 
-$VALID_MODULES = @("configurator","identity","movement","docs")
+$VALID_MODULES = @("configurator","identify","movement","docs")
 
 if ($t -and $c) { Write-Host "ERRO: use -t ou -c."; exit 1 }
 if (-not $t -and -not $c) { Write-Host "ERRO: informe -t ou -c."; exit 1 }
@@ -124,9 +124,18 @@ foreach ($currentModule in $TARGET_MODULES) {
         $execUser = "root"
         docker exec $DEV_CONTAINER getent passwd finlumia *> $null
         if ($LASTEXITCODE -eq 0) { $execUser = "finlumia" }
+        docker exec $DEV_CONTAINER bash -c @"
+mkdir -p /workspace/.gradle
+chown -R finlumia:finlumia /home/finlumia/.gradle /workspace/.gradle 2>/dev/null || true
+find /workspace -maxdepth 3 -name 'build' -type d -exec chown -R finlumia:finlumia {} + 2>/dev/null || true
+"@
         docker exec -u $execUser $DEV_CONTAINER bash -lc "./gradlew $GRADLE_TASK --no-daemon -Dspring.profiles.active=$PROFILE"
     } else {
-        .\gradlew.bat $GRADLE_TASK --no-daemon "-Dspring.profiles.active=$PROFILE"
+        if (Test-Path ".\gradlew.bat") {
+            .\gradlew.bat $GRADLE_TASK --no-daemon "-Dspring.profiles.active=$PROFILE"
+        } else {
+            .\gradlew $GRADLE_TASK --no-daemon "-Dspring.profiles.active=$PROFILE"
+        }
     }
     if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao compilar $currentModule"; exit 1 }
 

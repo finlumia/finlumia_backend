@@ -1,7 +1,33 @@
 services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/scripts/dbfinlumia.Dockerfile
+    image: finlumia/db:postgres18
+    container_name: finlumiadb
+    environment:
+      # POSTGRES_USER substitui o superusuario padrao "postgres" da imagem oficial.
+      POSTGRES_USER: papadopoulos
+      POSTGRES_PASSWORD: "rZA2JLhowDb09uZy386LVCTPaWZ4tO"
+      POSTGRES_DB: finlumia_transactions
+    ports:
+      - "28079:5432"
+    volumes:
+      - finlumia-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U papadopoulos -d finlumia_transactions"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
   dev:
     image: finlumia/dev:almalinux10
     container_name: finlumiadev
+    depends_on:
+      db:
+        condition: service_healthy
     #Fica esperando novas linhas que não serão preenchidas.
     # tail -> exibe o final do arquivo as 10 últimas linhas
     # -f -> fica exibindo o que há no tail
@@ -25,3 +51,4 @@ services:
 
 volumes:
   gradle-cache:
+  finlumia-postgres-data:
