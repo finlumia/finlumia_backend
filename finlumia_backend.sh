@@ -18,6 +18,8 @@
 #   - docker e docker buildx instalados
 #   - Tars dos modulos gerados pelo finlumia.sh (./finlumia.sh -all -c -pro)
 #     e disponiveis em docker/build/<modulo>-pro.tar
+#   - Um unico arquivo *.backup (pg_dump formato custom) em docker/backup/,
+#     usado para restaurar o banco na criacao do container (ver deploy_db).
 # =============================================================================
 set -euo pipefail
 
@@ -120,11 +122,29 @@ remove_db_volume() {
 deploy_db() {
   local reset_data="${1:-false}"
   local dockerfile="$PROJECT_ROOT/docker/scripts/dbfinlumia.Dockerfile"
+  local backup_dir="$PROJECT_ROOT/docker/backup"
 
   if [ ! -f "$dockerfile" ]; then
     echo "ERRO: Dockerfile nao encontrado: $dockerfile"
     exit 1
   fi
+
+  if [ ! -d "$backup_dir" ]; then
+    echo "ERRO: diretorio de backup nao encontrado: $backup_dir"
+    exit 1
+  fi
+
+  local backup_files=("$backup_dir"/*.backup)
+  if [ ! -e "${backup_files[0]}" ]; then
+    echo "ERRO: nenhum arquivo .backup encontrado em $backup_dir"
+    exit 1
+  fi
+  if [ "${#backup_files[@]}" -gt 1 ]; then
+    echo "ERRO: encontrado mais de um arquivo .backup em $backup_dir. Mantenha apenas um."
+    printf '  - %s\n' "${backup_files[@]}"
+    exit 1
+  fi
+  echo "Backup selecionado: ${backup_files[0]}"
 
   remove_container "$DB_CONTAINER"
 
@@ -151,6 +171,7 @@ deploy_db() {
     -e "POSTGRES_PASSWORD=$DB_PASS" \
     -e "POSTGRES_DB=$DB_NAME" \
     -v "${DB_VOLUME_NAME}:/var/lib/postgresql" \
+    -v "${backup_dir}:/docker-entrypoint-initdb.d/backup:ro" \
     --health-cmd "pg_isready -U $DB_USER -d $DB_NAME" \
     --health-interval=5s \
     --health-timeout=5s \
@@ -249,6 +270,11 @@ show_usage() {
   echo "  FINLUMIA_DB_USER        Usuario do banco (padrao: papadopoulos)"
   echo "  FINLUMIA_DB_PASS        Senha do banco"
   echo "  FINLUMIA_DB_NAME        Nome do banco (padrao: finlumia_transactions)"
+  echo ""
+  echo "Backup do banco:"
+  echo "  Coloque um unico arquivo *.backup em docker/backup/. Ele e montado"
+  echo "  no container e restaurado automaticamente na primeira inicializacao"
+  echo "  do volume de dados (nao roda de novo se o volume ja existir)."
 }
 
 if [ $# -eq 0 ]; then

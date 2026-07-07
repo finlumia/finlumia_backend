@@ -54,6 +54,7 @@ shared/src/main/resources/shared-pro.properties
 **/shared-pro.properties
 docker/base/*.tar
 docker/bases/*.tar
+docker/bases/finlumia_transactions
 docker/test/*.tar
 docker/build/*.tar
 docker/jdk/*.tar
@@ -101,7 +102,16 @@ Desktop.ini
 *.sql
 !docker/bases/migrations/*.sql
 
+# Backup do banco usado por finlumia_backend.sh / docker-compose.dev.yml
+# (contem dados reais, nunca deve ir para o git)
+docker/backup/*.backup
+!docker/backup/.gitkeep
+
 # Arquivos com caminho de Windows gerados acidentalmente no workspace
+# (clientes de sync no Windows por vezes trocam ":" por outro glifo, ex.: U+F03A,
+# entao o padrao "C:*" sozinho nao pega todos os casos)
 C:*
+C*Downloads*
+C*Users*
 
 

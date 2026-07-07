@@ -1,9 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKUP_FILE="/docker-entrypoint-initdb.d/finlumia_transactions.dump"
+BACKUP_DIR="/docker-entrypoint-initdb.d/backup"
 
-echo "Restaurando backup finlumia_transactions a partir de ${BACKUP_FILE}..."
+if [ ! -d "$BACKUP_DIR" ]; then
+  echo "ERRO: diretorio de backup nao montado em ${BACKUP_DIR}."
+  exit 1
+fi
+
+mapfile -t BACKUP_FILES < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name "*.backup")
+
+if [ "${#BACKUP_FILES[@]}" -eq 0 ]; then
+  echo "ERRO: nenhum arquivo .backup encontrado em ${BACKUP_DIR}."
+  exit 1
+fi
+
+if [ "${#BACKUP_FILES[@]}" -gt 1 ]; then
+  echo "ERRO: encontrado mais de um arquivo .backup em ${BACKUP_DIR}. Mantenha apenas um."
+  printf '  - %s\n' "${BACKUP_FILES[@]}"
+  exit 1
+fi
+
+BACKUP_FILE="${BACKUP_FILES[0]}"
+
+echo "Restaurando backup a partir de ${BACKUP_FILE}..."
 
 pg_restore \
   --username="${POSTGRES_USER}" \
@@ -13,4 +33,4 @@ pg_restore \
   --verbose \
   "${BACKUP_FILE}"
 
-echo "Backup finlumia_transactions restaurado com sucesso."
+echo "Backup restaurado com sucesso."

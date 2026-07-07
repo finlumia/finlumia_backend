@@ -1,8 +1,10 @@
 # =============================================================================
 # dbfinlumia.Dockerfile
 # -----------------------------------------------------------------------------
-# PostgreSQL 18 com restauracao automatica do backup base em
-# docker/bases/finlumia_transactions (formato custom pg_dump / PGDMP).
+# PostgreSQL 18 com restauracao automatica a partir de um backup (*.backup,
+# formato custom pg_dump / PGDMP) montado em /docker-entrypoint-initdb.d/backup
+# no momento da criacao do container (ver finlumia_backend.sh e
+# docker-compose.dev.yml). O backup NAO e copiado para dentro da imagem.
 #
 # O restore roda apenas na primeira inicializacao do volume de dados, via
 # /docker-entrypoint-initdb.d/, conforme o entrypoint oficial da imagem.
@@ -11,9 +13,8 @@
 FROM postgres:18
 
 LABEL maintainer="finlumia"
-LABEL description="PostgreSQL 18 com restore inicial do backup finlumia_transactions"
+LABEL description="PostgreSQL 18 com restore inicial a partir de backup montado em runtime"
 
-COPY docker/bases/finlumia_transactions /docker-entrypoint-initdb.d/finlumia_transactions.dump
 COPY docker/scripts/db-restore.sh /docker-entrypoint-initdb.d/01-restore-finlumia_transactions.sh
 COPY docker/scripts/db-harden-security.sh /docker-entrypoint-initdb.d/02-harden-security.sh
 

@@ -14,6 +14,7 @@ services:
       - "28079:5432"
     volumes:
       - finlumia-postgres-data:/var/lib/postgresql
+      - ./docker/backup:/docker-entrypoint-initdb.d/backup:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-finlumia_transactions}"]
       interval: 5s

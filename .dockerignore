@@ -7,10 +7,6 @@
 !docker/scripts/db-restore.sh
 !docker/scripts/db-harden-security.sh
 
-# Include database base backup used by dbfinlumia.Dockerfile.
-!docker/bases/
-!docker/bases/finlumia_transactions
-
 # Include only application JAR artifacts required by each module image.
 !configurator/build/libs/*.jar
 !docs/build/libs/*.jar
