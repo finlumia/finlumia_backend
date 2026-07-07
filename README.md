@@ -20,11 +20,12 @@ Este documento foi estruturado para apoiar onboarding, manutenção e evolução
 - [6) Subida do ambiente de desenvolvimento (container de desenvolvimento)](#6-subida-do-ambiente-de-desenvolvimento-container-de-desenvolvimento)
 - [7) Rodar módulos sem container (execução Gradle local)](#7-rodar-módulos-sem-container-execução-gradle-local)
 - [8) Build de imagem e subida de containers dos módulos](#8-build-de-imagem-e-subida-de-containers-dos-módulos)
-- [9) Sequência recomendada para onboarding técnico](#9-sequência-recomendada-para-onboarding-técnico)
-- [10) Troubleshooting rápido](#10-troubleshooting-rápido)
-- [11) Boas práticas de manutenção](#11-boas-práticas-de-manutenção)
-- [12) Segurança: pontos obrigatórios](#12-segurança-pontos-obrigatórios)
-- [13) Alinhamento técnico](#13-alinhamento-técnico)
+- [9) Subida de containers de produção (módulos + banco de dados)](#9-subida-de-containers-de-produção-módulos--banco-de-dados)
+- [10) Sequência recomendada para onboarding técnico](#10-sequência-recomendada-para-onboarding-técnico)
+- [11) Troubleshooting rápido](#11-troubleshooting-rápido)
+- [12) Boas práticas de manutenção](#12-boas-práticas-de-manutenção)
+- [13) Segurança: pontos obrigatórios](#13-segurança-pontos-obrigatórios)
+- [14) Alinhamento técnico](#14-alinhamento-técnico)
 
 ---
 
@@ -387,7 +388,103 @@ Remover container de teste do `configurator` em `dev`:
 
 ---
 
-## 9) Sequência recomendada para onboarding técnico
+## 9) Subida de containers de produção (módulos + banco de dados)
+
+O deploy em produção (ex.: VPS Linux) usa `finlumia_backend.sh`. Diferente do `finlumia.sh` (seção 8), esse script **não builda a partir do código-fonte**: ele parte de artefatos já prontos (`.tar` dos módulos) e só builda a imagem do banco na própria VPS.
+
+### Pré-requisitos
+
+- Docker e `docker buildx` instalados na VPS;
+- artefatos dos módulos gerados via `./finlumia.sh -all -c -pro` e copiados para `docker/build/<modulo>-pro.tar` na VPS (ver seção 8);
+- um único arquivo de backup do banco (`*.backup`, formato `pg_dump` custom) em `docker/backup/`. O script aborta com erro se o diretório estiver vazio ou tiver mais de um arquivo;
+- variável de ambiente `FINLUMIA_DB_PASS` exportada (obrigatória — o script aborta sem ela).
+
+### Variáveis de ambiente
+
+| Variável | Obrigatória | Padrão | Descrição |
+|---|---|---|---|
+| `FINLUMIA_DB_PASS` | sim | — | Senha do usuário do banco. |
+| `FINLUMIABACK_HOME` | não | diretório do script | Raiz do projeto na VPS. |
+| `FINLUMIA_DB_USER` | não | `papadopoulos` | Usuário do banco. |
+| `FINLUMIA_DB_NAME` | não | `finlumia_transactions` | Nome do banco. |
+
+> ⚠️ O Postgres só aplica `POSTGRES_PASSWORD` na **primeira inicialização** do volume de dados. Se `FINLUMIA_DB_PASS` mudar entre execuções de `bd` sem `-reset`, os módulos recebem a senha nova via `SPRING_DATASOURCE_PASSWORD`, mas o banco continua com a senha antiga gravada — a autenticação falha. Fixe `FINLUMIA_DB_PASS` em um local persistente na VPS (ex.: `/etc/environment`, fora do git) em vez de exportar manualmente a cada sessão.
+
+### Configurar como comando global na VPS (opcional)
+
+```bash
+# ~/.bashrc
+export FINLUMIABACK_HOME=/caminho/para/o/projeto
+alias finlumiaback="$FINLUMIABACK_HOME/finlumia_backend.sh"
+```
+
+```bash
+source ~/.bashrc
+finlumiaback -all
+```
+
+### Ordem recomendada
+
+Suba o banco antes dos módulos, pois eles dependem dele:
+
+```bash
+export FINLUMIA_DB_PASS=<senha-do-banco>
+./finlumia_backend.sh bd
+./finlumia_backend.sh -all
+```
+
+Ou um módulo por vez, acompanhando logs:
+
+```bash
+./finlumia_backend.sh identify -logs
+```
+
+### Comando `bd` (banco de dados)
+
+```bash
+./finlumia_backend.sh bd          # sobe/atualiza o container do banco, preservando dados existentes
+./finlumia_backend.sh bd -reset   # apaga o volume de dados e restaura o backup do zero
+```
+
+O que o comando faz, em ordem:
+
+1. valida que existe **exatamente um** arquivo `*.backup` em `docker/backup/` (erro e aborta se faltar ou se houver mais de um);
+2. remove o container antigo do banco (a imagem é reconstruída a cada execução);
+3. com `-reset`, remove também o volume `finlumia-postgres-data` — **isso apaga os dados atuais**;
+4. builda a imagem `finlumia/db:postgres18` a partir de `docker/scripts/dbfinlumia.Dockerfile`;
+5. sobe o container `finlumiadb`, montando o volume de dados e o diretório `docker/backup/` (somente leitura) em `/docker-entrypoint-initdb.d/backup`;
+6. o Postgres restaura o backup **apenas se o volume estiver vazio** (primeira vez, ou logo após `-reset`). Se o volume já tem dados, o restore é pulado e os dados existentes são preservados;
+7. aguarda o healthcheck (`pg_isready`) reportar `healthy` (até ~60s).
+
+O banco fica acessível somente em `127.0.0.1:28079` (não exposto publicamente); use túnel SSH para acessar com uma ferramenta de administração externa.
+
+### Comandos de módulo (`configurator`, `identify`, `movement`, `docs`)
+
+```bash
+./finlumia_backend.sh <modulo>        # sobe um módulo específico
+./finlumia_backend.sh <modulo> -logs  # sobe e acompanha os logs em seguida
+./finlumia_backend.sh -all            # sobe todos os módulos
+```
+
+O que acontece internamente, por módulo:
+
+1. exige que `docker/build/<modulo>-pro.tar` já exista (gerado na seção 8 com `./finlumia.sh <modulo> -c -pro`);
+2. remove container e imagem antigos do módulo;
+3. carrega o `.tar` (`docker load`) e sobe o container, ligado à rede `finlumia-net`;
+4. injeta `SPRING_PROFILES_ACTIVE=pro` e, para módulos com banco, `SPRING_DATASOURCE_*` apontando para `finlumiadb:5432` (rede interna, não a porta publicada no host);
+5. o módulo `docs` recebe as URLs internas dos demais módulos (`DOCS_MODULES_BASE_URL_*`) em vez de datasource.
+
+Cada módulo fica acessível somente em `127.0.0.1:<porta>` (ver tabela da seção 1).
+
+### Backup do banco (`docker/backup/`)
+
+- deve conter **um único** arquivo `*.backup` (pg_dump formato custom);
+- **nunca commitar** esse arquivo — `docker/backup/*.backup` está no `.gitignore`; transfira-o para a VPS por fora do git (`scp`, `rsync`, etc.);
+- para trocar de backup, substitua o arquivo antes de rodar `bd -reset` (sem `-reset`, o restore não roda de novo em um volume já existente).
+
+---
+
+## 10) Sequência recomendada para onboarding técnico
 
 1. Subir ambiente dev (`finlumiadev.ps1 -up`).
 2. Entrar no container (`finlumiadev.ps1 -shell`), quando necessário.
@@ -398,13 +495,16 @@ Remover container de teste do `configurator` em `dev`:
 
 ---
 
-## 10) Troubleshooting rápido
+## 11) Troubleshooting rápido
 
 - erro de imagem base ausente: validar arquivos em `docker/bases/*.tar`;
 - erro de porta em uso: verificar processos ocupando `40570-40574`;
 - erro de docs sem endpoints: confirmar se os módulos referenciados estão ativos;
 - erro de banco: revisar variáveis/propriedades de conexão do perfil em uso;
-- erro no Docker dentro do dev container: validar montagem de `/var/run/docker.sock`.
+- erro no Docker dentro do dev container: validar montagem de `/var/run/docker.sock`;
+- `ERRO: nenhum arquivo .backup encontrado em docker/backup` (produção): copiar o backup para `docker/backup/` na VPS antes de rodar `finlumia_backend.sh bd`;
+- `ERRO: encontrado mais de um arquivo .backup` (produção): manter apenas um arquivo `*.backup` no diretório;
+- módulo de produção falhando autenticação no banco: conferir se `FINLUMIA_DB_PASS` é o mesmo valor usado na primeira inicialização do volume (ver seção 9).
 
 ### Diagnóstico sugerido (ordem prática)
 
@@ -416,7 +516,7 @@ Remover container de teste do `configurator` em `dev`:
 
 ---
 
-## 11) Boas práticas de manutenção
+## 12) Boas práticas de manutenção
 
 ### Antes de codar
 
@@ -440,19 +540,20 @@ Remover container de teste do `configurator` em `dev`:
 
 ---
 
-## 12) Segurança: pontos obrigatórios
+## 13) Segurança: pontos obrigatórios
 
 - não versionar credenciais reais em `application*.properties`;
 - priorizar variáveis de ambiente para usuário, senha e chaves;
 - restringir documentação interna em ambientes produtivos;
 - revisar autenticação/autorização ao expor novas rotas;
-- não confiar em headers do cliente sem validação de contexto.
+- não confiar em headers do cliente sem validação de contexto;
+- nunca versionar backups reais do banco (`docker/backup/*.backup`) — usar apenas para restore local/VPS, sempre fora do git.
 
 Ao criar endpoints em `/api/**`, validar explicitamente o tratamento de `keyUser` e os critérios de autorização associados.
 
 ---
 
-## 13) Alinhamento técnico
+## 14) Alinhamento técnico
 
 Em caso de dúvida de implementação:
 
