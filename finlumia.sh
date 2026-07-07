@@ -122,31 +122,35 @@ done
 BASE_IMAGE="finlumia/base:finlumia-dev-almalinux10module_java21"
 BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10module_java21.tar"
 DEV_CONTAINER="finlumiadev"
-VALID_MODULES="configurator identify movement docs"
+VALID_MODULES="configurator identify movement docs document"
 
 declare -A HOST_PORTS_DEV=(
   ["configurator"]=28081
   ["identify"]=28083
   ["movement"]=28084
   ["docs"]=28082
+  ["document"]=28085
 )
 declare -A HOST_PORTS_PRO=(
- ["configurator"]=28081
+  ["configurator"]=28081
   ["identify"]=28083
   ["movement"]=28084
   ["docs"]=28082
+  ["document"]=28085
 )
 declare -A CONTAINER_PORTS=(
   ["configurator"]=28081
   ["identify"]=28083
   ["movement"]=28084
   ["docs"]=28082
+  ["document"]=28085
 )
 declare -A GRADLE_TASKS=(
   ["configurator"]=":configurator:bootJar"
   ["identify"]=":identify:bootJar"
   ["movement"]=":movement:bootJar"
   ["docs"]=":docs:bootJar"
+  ["document"]=":document:bootJar"
 )
 
 if [ "$FLAG_T" = true ] && [ "$FLAG_C" = true ]; then echo "ERRO: use -t ou -c."; exit 1; fi
@@ -270,7 +274,29 @@ for CURRENT_MODULE in $TARGET_MODULES; do
       docker stop "$CONTAINER_TEST" >/dev/null
       docker rm "$CONTAINER_TEST" >/dev/null
     fi
-    docker run -d --name "$CONTAINER_TEST" -p "${HOST_PORT}:${CONTAINER_PORT}" -e "SPRING_PROFILES_ACTIVE=$PROFILE" --restart unless-stopped "$MODULE_IMAGE"
+    DOCKER_RUN_ARGS=(
+      run -d
+      --name "$CONTAINER_TEST"
+      -p "${HOST_PORT}:${CONTAINER_PORT}"
+      -e "SPRING_PROFILES_ACTIVE=$PROFILE"
+      --restart unless-stopped
+    )
+
+    DOCKER_RUN_ARGS+=(
+      -e "SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:${DB_HOST_PORT}/finlumia_transactions"
+    )
+
+    if [ "$CURRENT_MODULE" = "docs" ]; then
+      DOCKER_RUN_ARGS+=(
+        -e "DOCS_MODULES_BASE_URL_CONFIGURATOR=http://host.docker.internal:28081"
+        -e "DOCS_MODULES_BASE_URL_IDENTIFY=http://host.docker.internal:28083"
+        -e "DOCS_MODULES_BASE_URL_MOVEMENT=http://host.docker.internal:28084"
+      )
+    fi
+
+    DOCKER_RUN_ARGS+=("$MODULE_IMAGE")
+
+    docker "${DOCKER_RUN_ARGS[@]}"
   fi
 
   echo "$CURRENT_MODULE | profile=$PROFILE | host=$HOST_PORT | container=$CONTAINER_PORT | image=$MODULE_IMAGE"

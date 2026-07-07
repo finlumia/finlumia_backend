@@ -22,7 +22,7 @@ public class OpenApiConfig {
     public GroupedOpenApi externalOpenApiGroup() {
         return GroupedOpenApi.builder()
                 .group("external")
-                .pathsToMatch(ApiPaths.EXTERNAL_API_PREFIX + "/**")
+                .pathsToMatch(ApiPaths.EXTERNAL_API_PREFIX + "/**", ApiPaths.CONFIG_API_PREFIX + "/**")
                 .build();
     }
 

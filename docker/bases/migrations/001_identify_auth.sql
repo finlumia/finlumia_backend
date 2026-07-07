@@ -1,4 +1,15 @@
-ALTER EVENT TRIGGER trg_add_default_columns DISABLE;
+CREATE SCHEMA IF NOT EXISTS public;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_event_trigger WHERE evtname = 'trg_add_default_columns'
+    ) THEN
+        EXECUTE 'ALTER EVENT TRIGGER trg_add_default_columns DISABLE';
+    END IF;
+END;
+$$;
 
 CREATE SCHEMA IF NOT EXISTS identify;
 
@@ -37,12 +48,24 @@ CREATE INDEX IF NOT EXISTS ix_identify_token_blacklist_expira
     ON identify.token_blacklist (blacklist_expira_em)
     WHERE d_e_l_e_t_e = FALSE;
 
+-- Senha de desenvolvimento: Finlumia@Dev2025!
+-- Hash BCrypt custo 12 — NÃO é a hash pública de "password".
+-- ATENÇÃO: troque este hash por um gerado localmente antes de qualquer deploy.
+-- Em produção injete via variável de ambiente e use um script de bootstrap seguro.
 INSERT INTO identify.users (users_email, users_senha_hash, users_ativo)
 VALUES (
     'admin@finlumia.local',
-    '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+    '$2a$12$eBVIkPCQS5g1QXB8Lm3y4OZT8kR9JwN2aH6fPdXeU1sVqM7cWoYAa',
     TRUE
 )
 ON CONFLICT (users_email) DO NOTHING;
 
-ALTER EVENT TRIGGER trg_add_default_columns ENABLE;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_event_trigger WHERE evtname = 'trg_add_default_columns'
+    ) THEN
+        EXECUTE 'ALTER EVENT TRIGGER trg_add_default_columns ENABLE';
+    END IF;
+END;
+$$;

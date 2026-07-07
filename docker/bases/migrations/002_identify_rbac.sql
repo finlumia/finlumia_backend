@@ -1,4 +1,12 @@
-ALTER EVENT TRIGGER trg_add_default_columns DISABLE;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_event_trigger WHERE evtname = 'trg_add_default_columns'
+    ) THEN
+        EXECUTE 'ALTER EVENT TRIGGER trg_add_default_columns DISABLE';
+    END IF;
+END;
+$$;
 
 CREATE TABLE IF NOT EXISTS identify.roles (
     role_nome        VARCHAR(50) PRIMARY KEY,
@@ -82,4 +90,12 @@ FROM identify.users u
 WHERE u.users_email = 'admin@finlumia.local'
 ON CONFLICT (users_roles_user_key, users_roles_role) DO NOTHING;
 
-ALTER EVENT TRIGGER trg_add_default_columns ENABLE;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_event_trigger WHERE evtname = 'trg_add_default_columns'
+    ) THEN
+        EXECUTE 'ALTER EVENT TRIGGER trg_add_default_columns ENABLE';
+    END IF;
+END;
+$$;

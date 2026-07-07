@@ -24,7 +24,7 @@ bin/
 !**/src/test/**/bin/
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -96,5 +96,12 @@ Thumbs.db
 Desktop.ini
 *.swp
 *.swo
+
+# SQL dump files (backups, exports locais)
+*.sql
+!docker/bases/migrations/*.sql
+
+# Arquivos com caminho de Windows gerados acidentalmente no workspace
+C:*
 
 

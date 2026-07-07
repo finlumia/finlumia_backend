@@ -14,10 +14,6 @@
 # Include only application JAR artifacts required by each module image.
 !configurator/build/libs/*.jar
 !docs/build/libs/*.jar
+!document/build/libs/*.jar
 !identify/build/libs/*.jar
 !movement/build/libs/*.jar
-!ecommerce/build/libs/*.jar
-!hub/hub/build/libs/*.jar
-!pdv/build/libs/*.jar
-!salesforce/build/libs/*.jar
-!storefront/build/libs/*.jar

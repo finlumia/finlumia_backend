@@ -7,15 +7,15 @@ services:
     container_name: finlumiadb
     environment:
       # POSTGRES_USER substitui o superusuario padrao "postgres" da imagem oficial.
-      POSTGRES_USER: papadopoulos
-      POSTGRES_PASSWORD: "rZA2JLhowDb09uZy386LVCTPaWZ4tO"
-      POSTGRES_DB: finlumia_transactions
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_NAME:-finlumia_transactions}"
     ports:
       - "28079:5432"
     volumes:
       - finlumia-postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U papadopoulos -d finlumia_transactions"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-finlumia_transactions}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -49,6 +49,28 @@ services:
     # Habilita funcionalidades de terminal como cores, cursor, prompts interativos.
     tty: true
 
+  docs:
+    build:
+      context: .
+      dockerfile: docker/scripts/docs.Dockerfile
+    image: finlumia/docs:latest
+    container_name: finlumia-docs
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      SUPPORT_UPLOAD_DIR: /tmp/finlumia/support/uploads
+      ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "28082:28082"
+    volumes:
+      - docs-uploads:/tmp/finlumia/support/uploads
+    restart: unless-stopped
+
 volumes:
   gradle-cache:
   finlumia-postgres-data:
+  docs-uploads:

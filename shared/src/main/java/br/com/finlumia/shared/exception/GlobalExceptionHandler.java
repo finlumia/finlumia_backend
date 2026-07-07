@@ -1,14 +1,20 @@
 package br.com.finlumia.shared.exception;
 
+import java.util.stream.Collectors;
+
+import br.com.finlumia.shared.views.DialogDefault;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import br.com.finlumia.shared.views.DialogDefault;
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(FinlumiaException.class)
     public ResponseEntity<DialogDefault> handleFinlumiaException(FinlumiaException exception) {
@@ -16,12 +22,30 @@ public class GlobalExceptionHandler {
         if (status == null) {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
+        return ResponseEntity.status(status).body(
+                new DialogDefault(exception.getCode(), exception.getTitle(), exception.getMessage()));
+    }
 
-        DialogDefault body = new DialogDefault(
-                exception.getCode(),
-                exception.getTitle(),
-                exception.getMessage());
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<DialogDefault> handleValidation(MethodArgumentNotValidException exception) {
+        String fields = exception.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(
+                new DialogDefault(422, "Dados inválidos", fields));
+    }
 
-        return ResponseEntity.status(status).body(body);
+    @ExceptionHandler(RateLimitException.class)
+    public ResponseEntity<DialogDefault> handleRateLimit(RateLimitException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(exception.getRetryAfterSeconds()))
+                .body(new DialogDefault(429, exception.getTitle(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<DialogDefault> handleGeneric(Exception exception) {
+        log.error("Unhandled exception", exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                new DialogDefault(500, "Erro interno", "Ocorreu um erro inesperado. Tente novamente."));
     }
 }

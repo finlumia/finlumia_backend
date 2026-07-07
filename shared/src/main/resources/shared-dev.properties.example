@@ -1,0 +1,26 @@
+# Credenciais de desenvolvimento local
+# Como usar: copie este arquivo para shared-dev.properties e preencha os valores reais.
+# O arquivo shared-dev.properties esta no .gitignore e NAO deve ser versionado.
+
+DB_USERNAME=
+DB_PASSWORD=
+FINLUMIA_INTERNAL_TOKEN=
+JWT_SECRET=
+DOCS_ADMIN_PASSWORD=
+
+# E-mail (SMTP) — provedor real para envio de codigos de verificacao/recuperacao de senha
+# SMTP_USERNAME deve ser a caixa principal (ex: me@thiagobenevide.com); os MAIL_FROM_*
+# abaixo sao os aliases dela configurados no provedor (ex: Zoho) para enviar como remetente.
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+MAIL_FROM_ACCOUNT=account.finlumia@thiagobenevide.com
+MAIL_FROM_RECOVER=recorver.finlumia@thiagobenevide.com
+MAIL_REPLY_TO=support.finlumia@thiagobenevide.com
+
+# Login com Google — Client ID criado em https://console.cloud.google.com/
+GOOGLE_CLIENT_ID=
+
+# Dev: habilita mapeamento de key-string para keyUser numerico
+finlumia.security.key-user-map.local-dev-key=1

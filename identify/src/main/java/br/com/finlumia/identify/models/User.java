@@ -8,5 +8,8 @@ public record User(
         String email,
         String passwordHash,
         boolean active,
-        Instant createdAt) {
+        Instant createdAt,
+        int failedAttempts,
+        Instant lockedUntil,
+        boolean emailVerified) {
 }

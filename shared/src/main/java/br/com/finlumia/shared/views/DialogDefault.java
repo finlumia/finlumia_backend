@@ -15,6 +15,6 @@ public class DialogDefault {
     @JsonProperty("title")
     private String title;
 
-    @JsonProperty("mensage")
-    private String mensage;
+    @JsonProperty("message")
+    private String message;
 }

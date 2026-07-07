@@ -21,6 +21,7 @@ $HOST_PORTS_DEV = @{
     "identify"     = 28083
     "movement"     = 28084
     "docs"         = 28082
+    "document"     = 28085
 }
 
 $HOST_PORTS_PRO = @{
@@ -28,6 +29,7 @@ $HOST_PORTS_PRO = @{
     "identify"     = 28083
     "movement"     = 28084
     "docs"         = 28082
+    "document"     = 28085
 }
 
 $CONTAINER_PORTS = @{
@@ -35,6 +37,7 @@ $CONTAINER_PORTS = @{
     "identify"     = 28083
     "movement"     = 28084
     "docs"         = 28082
+    "document"     = 28085
 }
 
 $GRADLE_TASKS = @{
@@ -42,9 +45,10 @@ $GRADLE_TASKS = @{
     "identify" = ":identify:bootJar"
     "movement" = ":movement:bootJar"
     "docs" = ":docs:bootJar"
+    "document" = ":document:bootJar"
 }
 
-$VALID_MODULES = @("configurator","identify","movement","docs")
+$VALID_MODULES = @("configurator","identify","movement","docs","document")
 
 if ($t -and $c) { Write-Host "ERRO: use -t ou -c."; exit 1 }
 if (-not $t -and -not $c) { Write-Host "ERRO: informe -t ou -c."; exit 1 }
@@ -156,7 +160,29 @@ find /workspace -maxdepth 3 -name 'build' -type d -exec chown -R finlumia:finlum
             docker rm $CONTAINER_TEST | Out-Null
         }
 
-        docker run -d --name $CONTAINER_TEST -p "${HOST_PORT}:${CONTAINER_PORT}" -e "SPRING_PROFILES_ACTIVE=$PROFILE" --restart unless-stopped $MODULE_IMAGE
+        $dockerRunArgs = @(
+            "run", "-d",
+            "--name", $CONTAINER_TEST,
+            "-p", "${HOST_PORT}:${CONTAINER_PORT}",
+            "-e", "SPRING_PROFILES_ACTIVE=$PROFILE",
+            "--restart", "unless-stopped"
+        )
+
+        $dockerRunArgs += @(
+            "-e", "SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:28079/finlumia_transactions"
+        )
+
+        if ($currentModule -eq "docs") {
+            $dockerRunArgs += @(
+                "-e", "DOCS_MODULES_BASE_URL_CONFIGURATOR=http://host.docker.internal:28081",
+                "-e", "DOCS_MODULES_BASE_URL_IDENTIFY=http://host.docker.internal:28083",
+                "-e", "DOCS_MODULES_BASE_URL_MOVEMENT=http://host.docker.internal:28084"
+            )
+        }
+
+        $dockerRunArgs += $MODULE_IMAGE
+
+        docker @dockerRunArgs
         if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao iniciar container $CONTAINER_TEST"; exit 1 }
     }
 
