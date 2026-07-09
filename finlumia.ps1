@@ -11,6 +11,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Evita que saida em stderr de comandos nativos (docker, gradle) vire excecao fatal.
+# O script ja valida sucesso/falha via $LASTEXITCODE apos cada chamada.
+$PSNativeCommandUseErrorActionPreference = $false
 
 $BASE_IMAGE = "finlumia/base:finlumia-dev-almalinux10module_java21"
 $BASE_IMAGE_TAR = "docker/bases/finlumia-dev-almalinux10module_java21.tar"
