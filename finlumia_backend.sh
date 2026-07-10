@@ -46,37 +46,42 @@ DB_USER="${FINLUMIA_DB_USER:-papadopoulos}"
 DB_PASS="${FINLUMIA_DB_PASS:?FINLUMIA_DB_PASS obrigatorio. Execute: export FINLUMIA_DB_PASS=<sua-senha>}"
 DB_NAME="${FINLUMIA_DB_NAME:-finlumia_transactions}"
 
-VALID_MODULES="configurator identify movement docs"
+VALID_MODULES="configurator identify movement docs document"
 
 declare -A CONTAINER_NAMES=(
   ["configurator"]="finlumia-configurator"
   ["identify"]="finlumia-identify"
   ["movement"]="finlumia-movement"
   ["docs"]="finlumia-docs"
+  ["document"]="finlumia-document"
 )
 declare -A IMAGES=(
   ["configurator"]="finlumia/configurator:latest"
   ["identify"]="finlumia/identify:latest"
   ["movement"]="finlumia/movement:latest"
   ["docs"]="finlumia/docs:latest"
+  ["document"]="finlumia/document:latest"
 )
 declare -A TAR_FILES=(
   ["configurator"]="docker/build/configurator-pro.tar"
   ["identify"]="docker/build/identify-pro.tar"
   ["movement"]="docker/build/movement-pro.tar"
   ["docs"]="docker/build/docs-pro.tar"
+  ["document"]="docker/build/document-pro.tar"
 )
 declare -A HOST_PORTS=(
   ["configurator"]="28081"
   ["identify"]="28083"
   ["movement"]="28084"
   ["docs"]="28082"
+  ["document"]="28085"
 )
 declare -A CONTAINER_PORTS=(
   ["configurator"]="28081"
   ["identify"]="28083"
   ["movement"]="28084"
   ["docs"]="28082"
+  ["document"]="28085"
 )
 
 # ---------------------------------------------------------------------------

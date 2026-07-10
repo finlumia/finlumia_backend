@@ -1,0 +1,207 @@
+##############################################################
+# docker-compose.homolog.yml — Ambiente de homologação
+#
+# Uso:
+#   docker compose -f docker-compose.homolog.yml up -d
+#
+# Variáveis obrigatórias (.env ou export):
+#   DB_USERNAME, DB_PASSWORD, DB_NAME
+#   ALLOWED_ORIGINS=https://homolog.finlumia.com.br
+#   JWT_SECRET=<segredo-min-32-chars>
+#   INTERNAL_SERVICE_TOKEN=<token-service-to-service>
+##############################################################
+
+services:
+
+  # -------------------------------------------------------
+  # Banco de dados
+  # -------------------------------------------------------
+  db:
+    build:
+      context: .
+      dockerfile: docker/scripts/dbfinlumia.Dockerfile
+    image: finlumia/db:postgres18
+    container_name: finlumia-db
+    environment:
+      POSTGRES_USER:     "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB:       "${DB_NAME:-finlumia_transactions}"
+    volumes:
+      - finlumia-postgres-data:/var/lib/postgresql
+      - ./docker/backup:/docker-entrypoint-initdb.d/backup:ro
+    healthcheck:
+      test:         ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-finlumia_transactions}"]
+      interval:     5s
+      timeout:      5s
+      retries:      10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Identify — autenticação e RBAC (porta 28083)
+  # -------------------------------------------------------
+  identify:
+    build:
+      context: .
+      dockerfile: docker/scripts/identify.Dockerfile
+    image: finlumia/identify:latest
+    container_name: finlumia-identify
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://homolog.finlumia.com.br}"
+      FINLUMIA_IDENTIFY_JWT_SECRET: "${JWT_SECRET}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Movement — transações financeiras (porta 28084)
+  # -------------------------------------------------------
+  movement:
+    build:
+      context: .
+      dockerfile: docker/scripts/movement.Dockerfile
+    image: finlumia/movement:latest
+    container_name: finlumia-movement
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://homolog.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Document — relatórios e exportações (porta 28085)
+  # -------------------------------------------------------
+  document:
+    build:
+      context: .
+      dockerfile: docker/scripts/document.Dockerfile
+    image: finlumia/document:latest
+    container_name: finlumia-document
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://homolog.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Configurator — configuração do sistema (porta 28081)
+  # -------------------------------------------------------
+  configurator:
+    build:
+      context: .
+      dockerfile: docker/scripts/configurator.Dockerfile
+    image: finlumia/configurator:latest
+    container_name: finlumia-configurator
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://homolog.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Docs — documentação da API + suporte (porta 28082)
+  # -------------------------------------------------------
+  docs:
+    build:
+      context: .
+      dockerfile: docker/scripts/docs.Dockerfile
+    image: finlumia/docs:latest
+    container_name: finlumia-docs
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://homolog.finlumia.com.br}"
+      SUPPORT_UPLOAD_DIR:         /tmp/finlumia/support/uploads
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    volumes:
+      - docs-uploads:/tmp/finlumia/support/uploads
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Frontend Next.js (porta 3000)
+  # Construído pelo repositório finlumia_frontend
+  # -------------------------------------------------------
+  frontend:
+    image: finlumia/frontend:latest   # build no pipeline do frontend
+    container_name: finlumia-frontend
+    environment:
+      NODE_ENV: production
+      # Em homolog o frontend já usa a mesma origem pois o Nginx
+      # roteia tudo — não precisa de URL separada para a API
+      NEXT_PUBLIC_API_BASE_URL: ""
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Nginx — reverse proxy e roteamento (portas 80)
+  # -------------------------------------------------------
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/scripts/nginx.Dockerfile
+    image: finlumia/nginx:latest
+    container_name: finlumia-nginx
+    depends_on:
+      - identify
+      - movement
+      - document
+      - configurator
+      - docs
+      - frontend
+    # Apenas a porta 80 é exposta; TLS termina no load balancer da cloud
+    ports:
+      - "80:80"
+    # Usar apenas finlumia-homolog.conf (sem SSL direto no Nginx)
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d/upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
+      - ./docker/nginx/conf.d/finlumia-homolog.conf:/etc/nginx/conf.d/finlumia-homolog.conf:ro
+      - ./docker/nginx/snippets:/etc/nginx/snippets:ro
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+volumes:
+  finlumia-postgres-data:
+  docs-uploads:
+
+networks:
+  finlumia-internal:
+    driver: bridge

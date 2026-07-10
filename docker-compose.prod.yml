@@ -1,0 +1,231 @@
+##############################################################
+# docker-compose.prod.yml — Ambiente de produção com HTTPS
+#
+# Uso:
+#   # 1. Gerar certificado (primeira vez):
+#   docker compose -f docker-compose.prod.yml run --rm certbot certonly \
+#     --webroot -w /var/www/certbot -d app.finlumia.com.br
+#
+#   # 2. Subir todos os serviços:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+#   # 3. Renovar certificado (cron mensal):
+#   docker compose -f docker-compose.prod.yml run --rm certbot renew
+#   docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
+#
+# Variáveis obrigatórias (.env ou secrets manager):
+#   DB_USERNAME, DB_PASSWORD, DB_NAME
+#   ALLOWED_ORIGINS=https://app.finlumia.com.br
+#   JWT_SECRET=<segredo-min-32-chars>
+#   INTERNAL_SERVICE_TOKEN=<token-service-to-service>
+##############################################################
+
+services:
+
+  # -------------------------------------------------------
+  # Banco de dados
+  # -------------------------------------------------------
+  db:
+    build:
+      context: .
+      dockerfile: docker/scripts/dbfinlumia.Dockerfile
+    image: finlumia/db:postgres18
+    container_name: finlumia-db
+    environment:
+      POSTGRES_USER:     "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB:       "${DB_NAME:-finlumia_transactions}"
+    volumes:
+      - finlumia-postgres-data:/var/lib/postgresql
+      - ./docker/backup:/docker-entrypoint-initdb.d/backup:ro
+    healthcheck:
+      test:         ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-finlumia_transactions}"]
+      interval:     5s
+      timeout:      5s
+      retries:      10
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Identify — autenticação e RBAC
+  # -------------------------------------------------------
+  identify:
+    build:
+      context: .
+      dockerfile: docker/scripts/identify.Dockerfile
+    image: finlumia/identify:latest
+    container_name: finlumia-identify
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
+      FINLUMIA_IDENTIFY_JWT_SECRET: "${JWT_SECRET}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Movement — transações financeiras
+  # -------------------------------------------------------
+  movement:
+    build:
+      context: .
+      dockerfile: docker/scripts/movement.Dockerfile
+    image: finlumia/movement:latest
+    container_name: finlumia-movement
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Document — relatórios e exportações
+  # -------------------------------------------------------
+  document:
+    build:
+      context: .
+      dockerfile: docker/scripts/document.Dockerfile
+    image: finlumia/document:latest
+    container_name: finlumia-document
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Configurator — configuração do sistema
+  # -------------------------------------------------------
+  configurator:
+    build:
+      context: .
+      dockerfile: docker/scripts/configurator.Dockerfile
+    image: finlumia/configurator:latest
+    container_name: finlumia-configurator
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Docs + Suporte
+  # -------------------------------------------------------
+  docs:
+    build:
+      context: .
+      dockerfile: docker/scripts/docs.Dockerfile
+    image: finlumia/docs:latest
+    container_name: finlumia-docs
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL:      "jdbc:postgresql://db:5432/${DB_NAME:-finlumia_transactions}"
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
+      ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
+      SUPPORT_UPLOAD_DIR:         /tmp/finlumia/support/uploads
+      FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+    volumes:
+      - docs-uploads:/tmp/finlumia/support/uploads
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Frontend Next.js
+  # -------------------------------------------------------
+  frontend:
+    image: finlumia/frontend:latest
+    container_name: finlumia-frontend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ""
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Nginx — TLS termination + reverse proxy
+  # -------------------------------------------------------
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/scripts/nginx.Dockerfile
+    image: finlumia/nginx:latest
+    container_name: finlumia-nginx
+    depends_on:
+      - identify
+      - movement
+      - document
+      - configurator
+      - docs
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d/upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
+      - ./docker/nginx/conf.d/finlumia-prod.conf:/etc/nginx/conf.d/finlumia-prod.conf:ro
+      - ./docker/nginx/snippets:/etc/nginx/snippets:ro
+      # Certificados Let's Encrypt (gerados pelo certbot abaixo)
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot-webroot:/var/www/certbot:ro
+    restart: unless-stopped
+    networks:
+      - finlumia-internal
+
+  # -------------------------------------------------------
+  # Certbot — renovação automática de certificado TLS
+  # -------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    container_name: finlumia-certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    # Não executa nada automaticamente — use `docker compose run certbot`
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
+    networks:
+      - finlumia-internal
+
+volumes:
+  finlumia-postgres-data:
+  docs-uploads:
+  letsencrypt:
+  certbot-webroot:
+
+networks:
+  finlumia-internal:
+    driver: bridge
