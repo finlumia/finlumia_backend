@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,7 +46,7 @@ public class GoogleAuthService {
     public GoogleLoginResponse authenticate(String idToken) {
         GoogleClaims claims = verifyGoogleToken(idToken);
 
-        String normalizedEmail = claims.email().trim().toLowerCase();
+        String normalizedEmail = claims.email().trim().toLowerCase(Locale.ROOT);
         Optional<UserProfileRecord> existing = userRepository.findFullProfileByEmail(normalizedEmail);
 
         boolean isNewUser = existing.isEmpty();

@@ -67,6 +67,13 @@ services:
       ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
       FINLUMIA_IDENTIFY_JWT_SECRET: "${JWT_SECRET}"
       FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+      SPRING_MAIL_HOST:           "${SMTP_HOST}"
+      SPRING_MAIL_PORT:           "${SMTP_PORT:-587}"
+      SPRING_MAIL_USERNAME:       "${SMTP_USERNAME}"
+      SPRING_MAIL_PASSWORD:       "${SMTP_PASSWORD}"
+      FINLUMIA_MAIL_FROM_ACCOUNT: "${MAIL_FROM_ACCOUNT}"
+      FINLUMIA_MAIL_FROM_RECOVER: "${MAIL_FROM_RECOVER}"
+      FINLUMIA_MAIL_REPLY_TO:     "${MAIL_REPLY_TO}"
     restart: unless-stopped
     networks:
       - finlumia-internal
@@ -89,6 +96,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD}"
       ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
       FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+      SPRING_MAIL_HOST:           "${SMTP_HOST}"
+      SPRING_MAIL_PORT:           "${SMTP_PORT:-587}"
+      SPRING_MAIL_USERNAME:       "${SMTP_USERNAME}"
+      SPRING_MAIL_PASSWORD:       "${SMTP_PASSWORD}"
+      FINLUMIA_MAIL_FROM_ACCOUNT: "${MAIL_FROM_ACCOUNT}"
+      FINLUMIA_MAIL_REPLY_TO:     "${MAIL_REPLY_TO}"
     restart: unless-stopped
     networks:
       - finlumia-internal
@@ -156,6 +169,12 @@ services:
       ALLOWED_ORIGINS:            "${ALLOWED_ORIGINS:-https://app.finlumia.com.br}"
       SUPPORT_UPLOAD_DIR:         /tmp/finlumia/support/uploads
       FINLUMIA_SECURITY_INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN}"
+      SPRING_MAIL_HOST:           "${SMTP_HOST}"
+      SPRING_MAIL_PORT:           "${SMTP_PORT:-587}"
+      SPRING_MAIL_USERNAME:       "${SMTP_USERNAME}"
+      SPRING_MAIL_PASSWORD:       "${SMTP_PASSWORD}"
+      FINLUMIA_MAIL_FROM_ACCOUNT: "${MAIL_FROM_ACCOUNT}"
+      FINLUMIA_MAIL_REPLY_TO:     "${MAIL_REPLY_TO}"
     volumes:
       - docs-uploads:/tmp/finlumia/support/uploads
     restart: unless-stopped

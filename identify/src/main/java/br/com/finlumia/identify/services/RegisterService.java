@@ -8,6 +8,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+
 @Service
 public class RegisterService {
 
@@ -26,7 +28,7 @@ public class RegisterService {
 
     @Transactional
     public RegisterResponse register(String name, String email, String password) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new FinlumiaException(409, "E-mail ja cadastrado", "Ja existe uma conta com este e-mail.");
         }

@@ -15,9 +15,9 @@ SMTP_HOST=
 SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
-MAIL_FROM_ACCOUNT=account.finlumia@thiagobenevide.com
-MAIL_FROM_RECOVER=recorver.finlumia@thiagobenevide.com
-MAIL_REPLY_TO=support.finlumia@thiagobenevide.com
+MAIL_FROM_ACCOUNT=account-finlumia@thiagobenevide.com
+MAIL_FROM_RECOVER=recorver-finlumia@thiagobenevide.com
+MAIL_REPLY_TO=support-finlumia@thiagobenevide.com
 
 # Login com Google — Client ID criado em https://console.cloud.google.com/
 GOOGLE_CLIENT_ID=

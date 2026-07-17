@@ -25,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
+    private final BudgetService budgetService;
 
-    public TransactionService(TransactionRepository transactionRepository) {
+    public TransactionService(TransactionRepository transactionRepository, BudgetService budgetService) {
         this.transactionRepository = transactionRepository;
+        this.budgetService = budgetService;
     }
 
     public TransactionListView list(UUID userKey, TransactionFilters filters) {
@@ -79,7 +81,9 @@ public class TransactionService {
                     null,
                     null
             );
-            created.add(TransactionView.from(transactionRepository.save(t)));
+            Transaction saved = transactionRepository.save(t);
+            budgetService.checkAndNotify(userKey, saved);
+            created.add(TransactionView.from(saved));
         }
 
         return created;

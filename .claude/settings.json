@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -liE \"mail|smtp|email\")",
+      "Bash(xargs grep -liE \"mail|smtp|email|orcamento|budget\")"
+    ]
+  }
+}

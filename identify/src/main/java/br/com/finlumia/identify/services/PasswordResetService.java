@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -37,7 +38,7 @@ public class PasswordResetService {
 
     @Transactional
     public ForgotPasswordResponse sendOtp(String email) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         // Always returns 200 to avoid leaking whether the email is registered
         userRepository.findActiveByEmail(normalizedEmail).ifPresent(user -> {
             String otp = TokenSecurityUtils.generateOtp();
@@ -51,7 +52,7 @@ public class PasswordResetService {
 
     @Transactional
     public VerifyResetTokenResponse verifyOtp(String email, String otp) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         PasswordResetRecord record = passwordResetRepository.findActiveByEmail(normalizedEmail)
                 .orElseThrow(() -> new FinlumiaException(400, "Token invalido", "Codigo invalido ou expirado."));
 

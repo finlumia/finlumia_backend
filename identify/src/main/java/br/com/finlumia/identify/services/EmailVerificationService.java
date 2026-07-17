@@ -1,6 +1,7 @@
 package br.com.finlumia.identify.services;
 
 import java.time.Instant;
+import java.util.Locale;
 
 import br.com.finlumia.identify.models.EmailVerificationRecord;
 import br.com.finlumia.identify.repositorys.EmailVerificationRepository;
@@ -29,7 +30,7 @@ public class EmailVerificationService {
 
     @Transactional
     public void sendVerificationCode(String email) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         String code = TokenSecurityUtils.generateOtp();
         String codeHash = TokenSecurityUtils.hashToken(code);
         Instant expiresAt = Instant.now().plusSeconds(CODE_EXPIRES_SECONDS);
@@ -39,7 +40,7 @@ public class EmailVerificationService {
 
     @Transactional
     public void verifyCode(String email, String code) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         EmailVerificationRecord record = emailVerificationRepository.findActiveByEmail(normalizedEmail)
                 .orElseThrow(() -> new FinlumiaException(400, "Codigo invalido", "Codigo invalido ou expirado."));
 
@@ -53,7 +54,7 @@ public class EmailVerificationService {
 
     @Transactional
     public void resendVerificationCode(String email) {
-        String normalizedEmail = email.trim().toLowerCase();
+        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         if (!userRepository.existsByEmail(normalizedEmail)) {
             // Nao revela se o e-mail existe, mesmo padrao do forgot-password.
             return;

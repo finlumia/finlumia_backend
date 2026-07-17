@@ -17,9 +17,11 @@ import java.util.*;
 public class TicketService {
 
     private final JdbcTemplate jdbc;
+    private final TicketEmailService ticketEmailService;
 
-    public TicketService(JdbcTemplate jdbc) {
+    public TicketService(JdbcTemplate jdbc, TicketEmailService ticketEmailService) {
         this.jdbc = jdbc;
+        this.ticketEmailService = ticketEmailService;
     }
 
     // ---------------------------------------------------------------
@@ -183,7 +185,10 @@ public class TicketService {
                 request.category(),
                 request.priority() != null ? request.priority() : "media",
                 request.description());
-        return getListItemById(newId);
+        TicketListItem item = getListItemById(newId);
+        ticketEmailService.sendTicketConfirmation(item);
+        ticketEmailService.sendSupportAlert(item);
+        return item;
     }
 
     // ---------------------------------------------------------------
