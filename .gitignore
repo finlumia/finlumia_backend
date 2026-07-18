@@ -66,6 +66,7 @@ docker/jdk/zulu21.50.19-ca-jdk21.0.11-linux_x64.tar.gz
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Keys and certificates
 *.pem
@@ -77,7 +78,6 @@ docker/jdk/zulu21.50.19-ca-jdk21.0.11-linux_x64.tar.gz
 # Generic secret artifacts
 *credentials*
 *secret*
-*token*
 
 # Runtime/packaging artifacts
 *.class
