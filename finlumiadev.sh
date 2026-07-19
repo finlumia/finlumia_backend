@@ -62,11 +62,11 @@ CMD="${1}"
 case "$CMD" in
   -up)
     ensure_base_images
-    docker compose -f "$COMPOSE_FILE" up -d
+    docker compose -f "$COMPOSE_FILE" up -d db dev
     ;;
   -rebuild)
     ensure_base_images
-    docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate db dev
     ;;
   -shell)
     docker compose -f "$COMPOSE_FILE" exec --user finlumia dev bash

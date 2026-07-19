@@ -72,13 +72,13 @@ function Ensure-BaseImages {
 
 if ($up) {
     Ensure-BaseImages
-    docker compose -f $composeFile up -d
+    docker compose -f $composeFile up -d db dev
     exit $LASTEXITCODE
 }
 
 if ($rebuild) {
     Ensure-BaseImages
-    docker compose -f $composeFile up -d --force-recreate
+    docker compose -f $composeFile up -d --force-recreate db dev
     exit $LASTEXITCODE
 }
 

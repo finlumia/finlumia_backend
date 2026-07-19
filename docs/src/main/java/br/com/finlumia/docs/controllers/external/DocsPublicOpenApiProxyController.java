@@ -1,6 +1,5 @@
 package br.com.finlumia.docs.controllers.external;
 
-import br.com.finlumia.docs.config.DocsModuleProperties;
 import br.com.finlumia.docs.config.DocsOpenApiPaths;
 import br.com.finlumia.docs.services.DocsOpenApiProxyService;
 import org.springframework.http.MediaType;

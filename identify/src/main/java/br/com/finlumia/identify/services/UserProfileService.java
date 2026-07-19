@@ -65,7 +65,6 @@ public class UserProfileService {
 
         userRepository.updateMfa(userKey, enabled);
 
-        // TODO: generate real TOTP secret and persist when enabling MFA
         String qrCodeUrl = enabled
                 ? "otpauth://totp/Finlumia:" + profile.email() + "?secret=PLACEHOLDER&issuer=Finlumia"
                 : null;

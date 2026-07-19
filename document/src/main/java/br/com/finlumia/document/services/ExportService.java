@@ -1,7 +1,6 @@
 package br.com.finlumia.document.services;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 import br.com.finlumia.document.models.ExportFormat;

@@ -25,7 +25,6 @@ public class TokenService {
 
     private static final Logger log = LoggerFactory.getLogger(TokenService.class);
 
-    private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final long LOCKOUT_MINUTES = 15;
     private static final long DEFAULT_REFRESH_TTL_SECONDS = 604_800L;   // 7 dias
     private static final long REMEMBER_REFRESH_TTL_SECONDS = 2_592_000L; // 30 dias
