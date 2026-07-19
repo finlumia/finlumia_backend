@@ -95,7 +95,7 @@ public class TransactionController {
     public ResponseEntity<List<TransactionView>> create(
             @RequestAttribute("usersKey") UUID userKey,
             @RequestBody @Valid TransactionCreateRequest request) {
-        return ResponseEntity.status(201).body(transactionService.create(userKey, request));
+        return ResponseEntity.status(201).body(transactionService.createTransaction(userKey, request));
     }
 
     @PutMapping("/{id}")

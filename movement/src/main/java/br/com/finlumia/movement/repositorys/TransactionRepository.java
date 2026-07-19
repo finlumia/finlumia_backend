@@ -110,6 +110,16 @@ public class TransactionRepository {
 
     public record TotalsData(BigDecimal totalIncome, BigDecimal totalExpenses) {}
 
+    public boolean existsDeleted(UUID id, UUID userKey) {
+        String sql = """
+                SELECT EXISTS (
+                    SELECT 1 FROM movement.transactions
+                    WHERE transaction_id = ? AND user_key = ? AND d_e_l_e_t_e = TRUE
+                )
+                """;
+        return Boolean.TRUE.equals(jdbc.queryForObject(sql, Boolean.class, id, userKey));
+    }
+
     public boolean existsDuplicate(UUID userKey, LocalDate date, BigDecimal amount, String description) {
         String sql = """
                 SELECT EXISTS (
@@ -150,7 +160,7 @@ public class TransactionRepository {
         return findById(t.id(), t.userKey()).orElseThrow();
     }
 
-    public Transaction update(UUID id, UUID userKey, Transaction t) {
+    public Optional<Transaction> update(UUID id, UUID userKey, Transaction t) {
         String sql = """
                 UPDATE movement.transactions SET
                     type = ?, method = ?, institution = ?, date = ?, category = ?,
@@ -158,7 +168,7 @@ public class TransactionRepository {
                     is_recurring = ?, recurring_id = ?, updated_at = NOW()
                 WHERE transaction_id = ? AND user_key = ? AND d_e_l_e_t_e = FALSE
                 """;
-        jdbc.update(conn -> {
+        int affected = jdbc.update(conn -> {
             PreparedStatement ps = conn.prepareStatement(sql);
             ps.setString(1, t.type().getValue());
             ps.setString(2, t.method().getValue());
@@ -176,10 +186,10 @@ public class TransactionRepository {
             ps.setObject(14, userKey);
             return ps;
         });
-        return findById(id, userKey).orElseThrow();
+        return affected == 0 ? Optional.empty() : findById(id, userKey);
     }
 
-    public Transaction patch(UUID id, UUID userKey, CategoryId category, String description, String notes, List<String> tags) {
+    public Optional<Transaction> patch(UUID id, UUID userKey, CategoryId category, String description, String notes, List<String> tags) {
         StringBuilder sb = new StringBuilder("UPDATE movement.transactions SET updated_at = NOW()");
         List<Object> params = new ArrayList<>();
         if (category != null) { sb.append(", category = ?"); params.add(category.getValue()); }
@@ -189,9 +199,10 @@ public class TransactionRepository {
         params.add(id);
         params.add(userKey);
 
+        int affected;
         if (tags != null) {
             String tagsSql = sb.toString().replace("SET updated_at = NOW()", "SET updated_at = NOW(), tags = ?");
-            jdbc.update(conn -> {
+            affected = jdbc.update(conn -> {
                 PreparedStatement ps = conn.prepareStatement(tagsSql);
                 int idx = 1;
                 ps.setArray(idx++, conn.createArrayOf("text", tags.toArray(new String[0])));
@@ -203,9 +214,9 @@ public class TransactionRepository {
                 return ps;
             });
         } else {
-            jdbc.update(sb.toString(), params.toArray());
+            affected = jdbc.update(sb.toString(), params.toArray());
         }
-        return findById(id, userKey).orElseThrow();
+        return affected == 0 ? Optional.empty() : findById(id, userKey);
     }
 
     public int softDelete(UUID id, UUID userKey) {

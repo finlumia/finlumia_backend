@@ -47,11 +47,19 @@ public class TransactionService {
     public TransactionView getById(UUID userKey, UUID id) {
         return transactionRepository.findById(id, userKey)
                 .map(TransactionView::from)
-                .orElseThrow(() -> new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado."));
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
+    }
+
+    private FinlumiaException notFoundOrGone(UUID userKey, UUID id) {
+        if (transactionRepository.existsDeleted(id, userKey)) {
+            return new FinlumiaException(410, "Lançamento removido",
+                    "Este lançamento faz parte de uma série que foi removida.");
+        }
+        return new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado.");
     }
 
     @Transactional
-    public List<TransactionView> create(UUID userKey, TransactionCreateRequest req) {
+    public List<TransactionView> createTransaction(UUID userKey, TransactionCreateRequest req) {
         boolean recurring = Boolean.TRUE.equals(req.isRecurring());
         int months = recurring && req.recurringMonths() != null ? req.recurringMonths() : 1;
 
@@ -91,8 +99,11 @@ public class TransactionService {
 
     @Transactional
     public TransactionView update(UUID userKey, UUID id, TransactionCreateRequest req) {
-        transactionRepository.findById(id, userKey)
-                .orElseThrow(() -> new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado."));
+        Transaction existing = transactionRepository.findById(id, userKey)
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
+
+        boolean recurring = req.isRecurring();
+        UUID recurringId = recurring ? existing.recurringId() : null;
 
         Transaction t = new Transaction(
                 id,
@@ -107,28 +118,31 @@ public class TransactionService {
                 req.amount(),
                 req.notes(),
                 req.tags(),
-                Boolean.TRUE.equals(req.isRecurring()),
-                null,
+                recurring,
+                recurringId,
                 null,
                 null
         );
 
-        return TransactionView.from(transactionRepository.update(id, userKey, t));
+        return transactionRepository.update(id, userKey, t)
+                .map(TransactionView::from)
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
     }
 
     @Transactional
     public TransactionView patch(UUID userKey, UUID id, TransactionPatchRequest req) {
         transactionRepository.findById(id, userKey)
-                .orElseThrow(() -> new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado."));
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
 
-        return TransactionView.from(
-                transactionRepository.patch(id, userKey, req.category(), req.description(), req.notes(), req.tags()));
+        return transactionRepository.patch(id, userKey, req.category(), req.description(), req.notes(), req.tags())
+                .map(TransactionView::from)
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
     }
 
     @Transactional
     public void delete(UUID userKey, UUID id, DeleteMode mode) {
         transactionRepository.findById(id, userKey)
-                .orElseThrow(() -> new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado."));
+                .orElseThrow(() -> notFoundOrGone(userKey, id));
 
         int affected = switch (mode) {
             case SINGLE -> transactionRepository.softDelete(id, userKey);
@@ -137,7 +151,7 @@ public class TransactionService {
         };
 
         if (affected == 0) {
-            throw new FinlumiaException(404, "Não encontrado", "Lançamento não encontrado.");
+            throw notFoundOrGone(userKey, id);
         }
     }
 

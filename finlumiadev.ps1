@@ -25,6 +25,8 @@ Set-Location $scriptDir
 $composeFile = "docker-compose.dev.yml"
 $baseImage = "finlumia/dev:almalinux10"
 $baseImageTar = "docker/bases/finlumia-dev-almalinux10.tar"
+$baseImage2 = "finlumia/base:finlumia-dev-almalinux10module_java21"
+$baseImageTar2 = "docker/bases/finlumia-dev-almalinux10module_java21.tar"
 
 if (-not (Test-Path $composeFile)) {
     Write-Host "ERRO: arquivo $composeFile nao encontrado."
@@ -32,19 +34,21 @@ if (-not (Test-Path $composeFile)) {
 }
 
 function Ensure-BaseImage {
-    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $baseImage }
+    param([string]$image, [string]$tar)
+
+    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $image }
     if ($exists) { return }
 
-    if (-not (Test-Path $baseImageTar)) {
-        Write-Host "ERRO: arquivo da imagem base nao encontrado: $baseImageTar"
+    if (-not (Test-Path $tar)) {
+        Write-Host "ERRO: arquivo da imagem base nao encontrado: $tar"
         exit 1
     }
 
-    $loadOutput = docker load -i $baseImageTar 2>&1
+    $loadOutput = docker load -i $tar 2>&1
     if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha no docker load."; exit 1 }
     $loadOutput | ForEach-Object { Write-Host $_ }
 
-    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $baseImage }
+    $exists = docker images --format "{{.Repository}}:{{.Tag}}" | Where-Object { $_ -eq $image }
     if ($exists) { return }
 
     $loadedImage = $loadOutput |
@@ -57,18 +61,23 @@ function Ensure-BaseImage {
         exit 1
     }
 
-    docker tag $loadedImage $baseImage
+    docker tag $loadedImage $image
     if ($LASTEXITCODE -ne 0) { Write-Host "ERRO: falha ao retaggear imagem base."; exit 1 }
 }
 
+function Ensure-BaseImages {
+    Ensure-BaseImage -image $baseImage -tar $baseImageTar
+    Ensure-BaseImage -image $baseImage2 -tar $baseImageTar2
+}
+
 if ($up) {
-    Ensure-BaseImage
+    Ensure-BaseImages
     docker compose -f $composeFile up -d
     exit $LASTEXITCODE
 }
 
 if ($rebuild) {
-    Ensure-BaseImage
+    Ensure-BaseImages
     docker compose -f $composeFile up -d --force-recreate
     exit $LASTEXITCODE
 }

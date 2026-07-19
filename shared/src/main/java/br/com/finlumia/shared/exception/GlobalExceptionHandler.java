@@ -8,8 +8,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -41,6 +43,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(exception.getRetryAfterSeconds()))
                 .body(new DialogDefault(429, exception.getTitle(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<DialogDefault> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        String message = "Parâmetro '" + exception.getName() + "' inválido: valor '" + exception.getValue() + "' não é aceito.";
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new DialogDefault(400, "Dados inválidos", message));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<DialogDefault> handleMissingParam(MissingServletRequestParameterException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new DialogDefault(400, "Dados inválidos", "Parâmetro obrigatório ausente: " + exception.getParameterName()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

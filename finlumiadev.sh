@@ -7,6 +7,8 @@ cd "$SCRIPT_DIR"
 COMPOSE_FILE="docker-compose.dev.yml"
 BASE_IMAGE="finlumia/dev:almalinux10"
 BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10.tar"
+BASE_IMAGE2="finlumia/base:finlumia-dev-almalinux10module_java21"
+BASE_IMAGE_TAR2="docker/bases/finlumia-dev-almalinux10module_java21.tar"
 
 usage() {
   echo "Uso: ./finlumiadev.sh [-up|-rebuild|-shell|-down|-status|-logs|-help]"
@@ -29,16 +31,18 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 ensure_base_image() {
-  if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$BASE_IMAGE"; then
+  local image="$1"
+  local tar="$2"
+  if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$image"; then
     return
   fi
-  if [ ! -f "$BASE_IMAGE_TAR" ]; then
-    echo "ERRO: arquivo da imagem base nao encontrado: $BASE_IMAGE_TAR"
+  if [ ! -f "$tar" ]; then
+    echo "ERRO: arquivo da imagem base nao encontrado: $tar"
     exit 1
   fi
-  LOAD_OUTPUT="$(docker load -i "$BASE_IMAGE_TAR" 2>&1)"
+  LOAD_OUTPUT="$(docker load -i "$tar" 2>&1)"
   echo "$LOAD_OUTPUT"
-  if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$BASE_IMAGE"; then
+  if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$image"; then
     return
   fi
   LOADED_IMAGE="$(echo "$LOAD_OUTPUT" | sed -n 's/^Loaded image: //p' | awk 'NR==1')"
@@ -46,17 +50,22 @@ ensure_base_image() {
     echo "ERRO: nao foi possivel identificar a imagem carregada para retag."
     exit 1
   fi
-  docker tag "$LOADED_IMAGE" "$BASE_IMAGE"
+  docker tag "$LOADED_IMAGE" "$image"
+}
+
+ensure_base_images() {
+  ensure_base_image "$BASE_IMAGE" "$BASE_IMAGE_TAR"
+  ensure_base_image "$BASE_IMAGE2" "$BASE_IMAGE_TAR2"
 }
 
 CMD="${1}"
 case "$CMD" in
   -up)
-    ensure_base_image
+    ensure_base_images
     docker compose -f "$COMPOSE_FILE" up -d
     ;;
   -rebuild)
-    ensure_base_image
+    ensure_base_images
     docker compose -f "$COMPOSE_FILE" up -d --force-recreate
     ;;
   -shell)

@@ -23,6 +23,6 @@ public record TransactionCreateRequest(
         @NotNull @DecimalMin("0.01") BigDecimal amount,
         String notes,
         List<String> tags,
-        @JsonProperty("isRecurring") Boolean isRecurring,
+        @NotNull @JsonProperty("isRecurring") Boolean isRecurring,
         @JsonProperty("recurringMonths") @Min(1) @Max(36) Integer recurringMonths
 ) {}
