@@ -5,19 +5,19 @@
 #
 # Uso:
 #   ./finlumia_backend.sh bd [-reset]
-#   ./finlumia_backend.sh <modulo> -hom|-prod [-logs]
-#   ./finlumia_backend.sh -all -hom|-prod
+#   ./finlumia_backend.sh <modulo> -hom|-pro [-logs]
+#   ./finlumia_backend.sh -all -hom|-pro
 #
 # Para chamar como comando global na VPS:
 #   1. Edite ~/.bashrc e adicione:
 #        export FINLUMIABACK_HOME=/caminho/para/o/projeto
 #        alias finlumiaback="$FINLUMIABACK_HOME/finlumia_backend.sh"
 #   2. Recarregue: source ~/.bashrc
-#   3. Agora pode usar de qualquer lugar: finlumiaback -all -prod
+#   3. Agora pode usar de qualquer lugar: finlumiaback -all -pro
 #
 # Pre-requisitos:
 #   - docker e docker buildx instalados
-#   - Tars dos modulos gerados pelo finlumia.sh (./finlumia.sh -all -c -hom|-prod)
+#   - Tars dos modulos gerados pelo finlumia.sh (./finlumia.sh -all -c -hom|-pro)
 #     e disponiveis em docker/build/<modulo>-<profile>.tar
 #   - Um unico arquivo *.backup (pg_dump formato custom) em docker/backup/,
 #     usado para restaurar o banco na criacao do container (ver deploy_db).
@@ -38,9 +38,9 @@ fi
 # ---------------------------------------------------------------------------
 # Configuracao global
 # ---------------------------------------------------------------------------
-# PROFILE e definido no parse de argumentos (-hom ou -prod), obrigatorio.
+# PROFILE e definido no parse de argumentos (-hom ou -pro), obrigatorio.
 PROFILE=""
-VALID_PROFILES="hom prod"
+VALID_PROFILES="hom pro"
 NETWORK_NAME="finlumia-net"
 
 DB_CONTAINER="finlumiadb"
@@ -54,8 +54,9 @@ DB_NAME="${FINLUMIA_DB_NAME:-finlumia_transactions}"
 VALID_MODULES="configurator identify movement docs document"
 
 # CONTAINER_NAMES/IMAGES/TAR_FILES sao montados em runtime com o sufixo do
-# profile (ver resolve_module_vars), pois hom e prod podem rodar lado a lado
-# no mesmo host no futuro. Hoje os dois apontam para a mesma VPS/porta.
+# profile (ver container_name_for/image_name_for/tar_file_for), pois hom e pro
+# podem rodar lado a lado no mesmo host no futuro. Hoje os dois apontam para
+# a mesma VPS/porta.
 declare -A HOST_PORTS=(
   ["configurator"]="28081"
   ["identify"]="28083"
@@ -189,7 +190,7 @@ deploy_db() {
 # Deploy de modulo de aplicacao
 # ---------------------------------------------------------------------------
 
-# Nomes de container/imagem/tar dependem do profile ativo (hom ou prod), para
+# Nomes de container/imagem/tar dependem do profile ativo (hom ou pro), para
 # permitir os dois rodando lado a lado no mesmo host no futuro.
 container_name_for() { echo "finlumia-${1}-${PROFILE}"; }
 image_name_for()     { echo "finlumia/${1}:${PROFILE}"; }
@@ -259,8 +260,8 @@ deploy_module() {
 show_usage() {
   echo "Uso:"
   echo "  $0 bd [-reset]                    Sobe o banco de dados (com -reset apaga os dados)"
-  echo "  $0 <modulo> -hom|-prod [-logs]    Sobe um modulo especifico e aguarda logs (opcional)"
-  echo "  $0 -all -hom|-prod                Sobe todos os modulos de aplicacao"
+  echo "  $0 <modulo> -hom|-pro [-logs]    Sobe um modulo especifico e aguarda logs (opcional)"
+  echo "  $0 -all -hom|-pro                Sobe todos os modulos de aplicacao"
   echo ""
   echo "Modulos disponiveis: $VALID_MODULES"
   echo "Profiles disponiveis: $VALID_PROFILES"
@@ -305,7 +306,7 @@ while [ $# -gt 0 ]; do
     -all)  FLAG_ALL=true ;;
     -logs) FLAG_LOGS=true ;;
     -hom)  PROFILE="hom" ;;
-    -prod) PROFILE="prod" ;;
+    -pro) PROFILE="pro" ;;
     -h|--help) show_usage; exit 0 ;;
     -*)
       echo "ERRO: flag desconhecida: $1"
@@ -335,7 +336,7 @@ if [ "$FLAG_ALL" = false ] && [ -z "$MODULE" ]; then
 fi
 
 if [ -z "$PROFILE" ]; then
-  echo "ERRO: informe -hom ou -prod."
+  echo "ERRO: informe -hom ou -pro."
   show_usage
   exit 1
 fi

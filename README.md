@@ -20,7 +20,7 @@ Este documento foi estruturado para apoiar onboarding, manutenção e evolução
 - [6) Subida do ambiente de desenvolvimento (container de desenvolvimento)](#6-subida-do-ambiente-de-desenvolvimento-container-de-desenvolvimento)
 - [7) Rodar módulos sem container (execução Gradle local)](#7-rodar-módulos-sem-container-execução-gradle-local)
 - [8) Build de imagem e subida de containers dos módulos](#8-build-de-imagem-e-subida-de-containers-dos-módulos)
-- [9) Subida de containers de produção (módulos + banco de dados)](#9-subida-de-containers-de-produção-módulos--banco-de-dados)
+- [9) Subida de containers de produção (módulos + banco de dados)](#9-subida-de-containers-de-proução-módulos--banco-de-dados)
 - [10) Sequência recomendada para onboarding técnico](#10-sequência-recomendada-para-onboarding-técnico)
 - [11) Troubleshooting rápido](#11-troubleshooting-rápido)
 - [12) Boas práticas de manutenção](#12-boas-práticas-de-manutenção)
@@ -182,7 +182,7 @@ Os perfis suportados pelos scripts são:
 
 - `local`: desenvolvimento na sua máquina (segredos em `shared-local.properties`);
 - `hom`: homologação (segredos em `shared-hom.properties`);
-- `prod`: produção (segredos em `shared-prod.properties`).
+- `prod`: produção (segredos em `shared-pro.properties`).
 
 Hoje `hom` e `prod` apontam para a mesma VPS/banco — os dois arquivos devem ficar com os mesmos valores até existir infraestrutura separada.
 
@@ -336,13 +336,13 @@ O script `finlumia.ps1` (Windows) e `finlumia.sh` (Linux/macOS) automatiza:
 Windows:
 
 ```powershell
-.\finlumia.ps1 <modulo>|-all -t|-c -local|-hom|-prod [-s]
+.\finlumia.ps1 <modulo>|-all -t|-c -local|-hom|-pro [-s]
 ```
 
 Linux/macOS:
 
 ```bash
-./finlumia.sh <modulo>|-all -t|-c -local|-hom|-prod [-s]
+./finlumia.sh <modulo>|-all -t|-c -local|-hom|-pro [-s]
 ```
 
 Parâmetros:
@@ -351,7 +351,7 @@ Parâmetros:
 - `-all`: processa todos os módulos;
 - `-t`: modo teste (sobe container automaticamente);
 - `-c`: modo distribuição (gera artefato, sem subir container);
-- `-local`, `-hom` ou `-prod`: define o profile (segredos vêm de `shared-<profile>.properties`, ver seção 7);
+- `-local`, `-hom` ou `-pro`: define o profile (segredos vêm de `shared-<profile>.properties`, ver seção 7);
 - `-s`: remove container de teste (somente com `-t`).
 
 ### Exemplos de uso
@@ -365,7 +365,7 @@ Subir container de teste do `configurator` em `local`:
 Gerar artefatos de todos os módulos para distribuição em `prod`:
 
 ```powershell
-.\finlumia.ps1 -all -c -prod
+.\finlumia.ps1 -all -c -pro
 ```
 
 Remover container de teste do `configurator` em `local`:
@@ -386,7 +386,7 @@ Remover container de teste do `configurator` em `local`:
 
 1. gerar imagem em `-t -local` e validar comportamento local;
 2. revisar logs do container e endpoints críticos;
-3. gerar artefato final com `-c -hom` (ou `-c -prod`);
+3. gerar artefato final com `-c -hom` (ou `-c -pro`);
 4. armazenar/publicar artefato conforme processo interno da equipe.
 
 ---
@@ -398,7 +398,7 @@ O deploy em produção (ex.: VPS Linux) usa `finlumia_backend.sh`. Diferente do 
 ### Pré-requisitos
 
 - Docker e `docker buildx` instalados na VPS;
-- artefatos dos módulos gerados via `./finlumia.sh -all -c -hom` (ou `-prod`) e copiados para `docker/build/<modulo>-<profile>.tar` na VPS (ver seção 8);
+- artefatos dos módulos gerados via `./finlumia.sh -all -c -hom` (ou `-pro`) e copiados para `docker/build/<modulo>-<profile>.tar` na VPS (ver seção 8);
 - um único arquivo de backup do banco (`*.backup`, formato `pg_dump` custom) em `docker/backup/`. O script aborta com erro se o diretório estiver vazio ou tiver mais de um arquivo;
 - variável de ambiente `FINLUMIA_DB_PASS` exportada (obrigatória — o script aborta sem ela).
 
@@ -423,7 +423,7 @@ alias finlumiaback="$FINLUMIABACK_HOME/finlumia_backend.sh"
 
 ```bash
 source ~/.bashrc
-finlumiaback -all -prod
+finlumiaback -all -pro
 ```
 
 ### Ordem recomendada
@@ -433,13 +433,13 @@ Suba o banco antes dos módulos, pois eles dependem dele:
 ```bash
 export FINLUMIA_DB_PASS=<senha-do-banco>
 ./finlumia_backend.sh bd
-./finlumia_backend.sh -all -prod
+./finlumia_backend.sh -all -pro
 ```
 
 Ou um módulo por vez, acompanhando logs:
 
 ```bash
-./finlumia_backend.sh identify -prod -logs
+./finlumia_backend.sh identify -pro -logs
 ```
 
 ### Comando `bd` (banco de dados)
@@ -471,7 +471,7 @@ O banco fica acessível somente em `127.0.0.1:28079` (não exposto publicamente)
 
 O que acontece internamente, por módulo:
 
-1. exige que `docker/build/<modulo>-<profile>.tar` já exista (gerado na seção 8 com `./finlumia.sh <modulo> -c -hom|-prod`);
+1. exige que `docker/build/<modulo>-<profile>.tar` já exista (gerado na seção 8 com `./finlumia.sh <modulo> -c -hom|-pro`);
 2. remove container e imagem antigos do módulo;
 3. carrega o `.tar` (`docker load`) e sobe o container, ligado à rede `finlumia-net`;
 4. injeta `SPRING_PROFILES_ACTIVE=<hom|prod>` e, para módulos com banco, `SPRING_DATASOURCE_*` apontando para `finlumiadb:5432` (rede interna, não a porta publicada no host);

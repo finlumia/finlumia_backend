@@ -8,7 +8,7 @@ param(
     [switch]$s,
     [switch]$local,
     [switch]$hom,
-    [switch]$prod
+    [switch]$pro
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,8 +49,8 @@ $VALID_MODULES = @("configurator","identify","movement","docs","document")
 if ($t -and $c) { Write-Host "ERRO: use -t ou -c."; exit 1 }
 if (-not $t -and -not $c) { Write-Host "ERRO: informe -t ou -c."; exit 1 }
 if ($s -and -not $t) { Write-Host "ERRO: -s so pode ser usado com -t."; exit 1 }
-$profileCount = @($local, $hom, $prod | Where-Object { $_ }).Count
-if ($profileCount -ne 1) { Write-Host "ERRO: informe exatamente um de -local, -hom ou -prod."; exit 1 }
+$profileCount = @($local, $hom, $pro | Where-Object { $_ }).Count
+if ($profileCount -ne 1) { Write-Host "ERRO: informe exatamente um de -local, -hom ou -pro."; exit 1 }
 if ($all -and $module) { Write-Host "ERRO: use modulo unico ou -all."; exit 1 }
 if (-not $all -and -not $module) { Write-Host "ERRO: informe um modulo ou use -all."; exit 1 }
 if (-not $all -and ($VALID_MODULES -notcontains $module)) {
@@ -58,7 +58,7 @@ if (-not $all -and ($VALID_MODULES -notcontains $module)) {
     exit 1
 }
 
-$PROFILE = if ($local) { "local" } elseif ($hom) { "hom" } else { "prod" }
+$PROFILE = if ($local) { "local" } elseif ($hom) { "hom" } else { "pro" }
 $TARGET_MODULES = if ($all) { $VALID_MODULES } else { @($module) }
 
 function Ensure-BaseImage {

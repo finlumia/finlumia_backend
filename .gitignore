@@ -47,7 +47,7 @@ out/
 # Unico lugar de segredos e shared/src/main/resources/shared-<local|hom|prod>.properties
 **/shared-local.properties
 **/shared-hom.properties
-**/shared-prod.properties
+**/shared-pro.properties
 docker/base/*.tar
 docker/bases/*.tar
 docker/bases/finlumia_transactions

@@ -95,7 +95,7 @@ PROFILE=""
 
 if [ $# -eq 0 ]; then
   echo "Uso: ./finlumia.sh bd [-reset]"
-  echo "     ./finlumia.sh <modulo>|-all [-t|-c] -local|-hom|-prod [-s]"
+  echo "     ./finlumia.sh <modulo>|-all [-t|-c] -local|-hom|-pro [-s]"
   exit 1
 fi
 
@@ -106,7 +106,7 @@ while [ $# -gt 0 ]; do
     -s) FLAG_S=true ;;
     -local) PROFILE="local" ;;
     -hom)   PROFILE="hom" ;;
-    -prod)  PROFILE="prod" ;;
+    -pro)  PROFILE="pro" ;;
     -all) FLAG_ALL=true ;;
     *)
       if [[ "$1" == -* ]]; then
@@ -149,7 +149,7 @@ declare -A GRADLE_TASKS=(
 if [ "$FLAG_T" = true ] && [ "$FLAG_C" = true ]; then echo "ERRO: use -t ou -c."; exit 1; fi
 if [ "$FLAG_T" = false ] && [ "$FLAG_C" = false ]; then echo "ERRO: informe -t ou -c."; exit 1; fi
 if [ "$FLAG_S" = true ] && [ "$FLAG_T" = false ]; then echo "ERRO: -s so com -t."; exit 1; fi
-if [ -z "$PROFILE" ]; then echo "ERRO: informe -local, -hom ou -prod."; exit 1; fi
+if [ -z "$PROFILE" ]; then echo "ERRO: informe -local, -hom ou -pro."; exit 1; fi
 if [ "$FLAG_ALL" = true ] && [ -n "$MODULE" ]; then echo "ERRO: use modulo unico ou -all."; exit 1; fi
 if [ "$FLAG_ALL" = false ] && [ -z "$MODULE" ]; then echo "ERRO: informe modulo ou -all."; exit 1; fi
 
