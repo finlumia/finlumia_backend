@@ -43,15 +43,11 @@ out/
 .vscode/
 
 
-# Spring local profiles with credentials
-shared/src/main/resources/application-dev.properties
-shared/src/main/resources/application-pro.properties
-shared/src/main/resources/shared-dev.properties
-shared/src/main/resources/shared-pro.properties
-**/application-dev.properties
-**/application-pro.properties
-**/shared-dev.properties
-**/shared-pro.properties
+# Spring profiles with credentials — segredos por ambiente, nunca versionados.
+# Unico lugar de segredos e shared/src/main/resources/shared-<local|hom|prod>.properties
+**/shared-local.properties
+**/shared-hom.properties
+**/shared-prod.properties
 docker/base/*.tar
 docker/bases/*.tar
 docker/bases/finlumia_transactions

@@ -89,14 +89,13 @@ fi
 FLAG_T=false
 FLAG_C=false
 FLAG_S=false
-FLAG_PRO=false
-FLAG_DEV=false
 FLAG_ALL=false
 MODULE=""
+PROFILE=""
 
 if [ $# -eq 0 ]; then
   echo "Uso: ./finlumia.sh bd [-reset]"
-  echo "     ./finlumia.sh <modulo>|-all [-t|-c] [-pro|-dev] [-s]"
+  echo "     ./finlumia.sh <modulo>|-all [-t|-c] -local|-hom|-prod [-s]"
   exit 1
 fi
 
@@ -105,8 +104,9 @@ while [ $# -gt 0 ]; do
     -t) FLAG_T=true ;;
     -c) FLAG_C=true ;;
     -s) FLAG_S=true ;;
-    -pro) FLAG_PRO=true ;;
-    -dev) FLAG_DEV=true ;;
+    -local) PROFILE="local" ;;
+    -hom)   PROFILE="hom" ;;
+    -prod)  PROFILE="prod" ;;
     -all) FLAG_ALL=true ;;
     *)
       if [[ "$1" == -* ]]; then
@@ -124,14 +124,7 @@ BASE_IMAGE_TAR="docker/bases/finlumia-dev-almalinux10module_java21.tar"
 DEV_CONTAINER="finlumiadev"
 VALID_MODULES="configurator identify movement docs document"
 
-declare -A HOST_PORTS_DEV=(
-  ["configurator"]=28081
-  ["identify"]=28083
-  ["movement"]=28084
-  ["docs"]=28082
-  ["document"]=28085
-)
-declare -A HOST_PORTS_PRO=(
+declare -A HOST_PORTS=(
   ["configurator"]=28081
   ["identify"]=28083
   ["movement"]=28084
@@ -156,13 +149,9 @@ declare -A GRADLE_TASKS=(
 if [ "$FLAG_T" = true ] && [ "$FLAG_C" = true ]; then echo "ERRO: use -t ou -c."; exit 1; fi
 if [ "$FLAG_T" = false ] && [ "$FLAG_C" = false ]; then echo "ERRO: informe -t ou -c."; exit 1; fi
 if [ "$FLAG_S" = true ] && [ "$FLAG_T" = false ]; then echo "ERRO: -s so com -t."; exit 1; fi
-if [ "$FLAG_PRO" = true ] && [ "$FLAG_DEV" = true ]; then echo "ERRO: use -pro ou -dev."; exit 1; fi
-if [ "$FLAG_PRO" = false ] && [ "$FLAG_DEV" = false ]; then echo "ERRO: informe -pro ou -dev."; exit 1; fi
+if [ -z "$PROFILE" ]; then echo "ERRO: informe -local, -hom ou -prod."; exit 1; fi
 if [ "$FLAG_ALL" = true ] && [ -n "$MODULE" ]; then echo "ERRO: use modulo unico ou -all."; exit 1; fi
 if [ "$FLAG_ALL" = false ] && [ -z "$MODULE" ]; then echo "ERRO: informe modulo ou -all."; exit 1; fi
-
-PROFILE="dev"
-if [ "$FLAG_PRO" = true ]; then PROFILE="pro"; fi
 
 ensure_base_image() {
   if docker images --format "{{.Repository}}:{{.Tag}}" | grep -qx "$BASE_IMAGE"; then
@@ -236,13 +225,9 @@ prepare_gradle_env() {
 for CURRENT_MODULE in $TARGET_MODULES; do
   GRADLE_TASK="${GRADLE_TASKS[$CURRENT_MODULE]}"
   DOCKERFILE="docker/scripts/${CURRENT_MODULE}.Dockerfile"
-  MODULE_IMAGE="finlumia/${CURRENT_MODULE}:latest"
+  MODULE_IMAGE="finlumia/${CURRENT_MODULE}:${PROFILE}"
   CONTAINER_PORT="${CONTAINER_PORTS[$CURRENT_MODULE]}"
-  if [ "$PROFILE" = "pro" ]; then
-    HOST_PORT="${HOST_PORTS_PRO[$CURRENT_MODULE]}"
-  else
-    HOST_PORT="${HOST_PORTS_DEV[$CURRENT_MODULE]}"
-  fi
+  HOST_PORT="${HOST_PORTS[$CURRENT_MODULE]}"
   CONTAINER_TEST="test-${CURRENT_MODULE}-${PROFILE}"
 
   if [ ! -f "$DOCKERFILE" ]; then

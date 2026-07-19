@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
 # =============================================================================
-# finlumia_backend.sh — Deploy de producao Finlumia na VPS
+# finlumia_backend.sh — Deploy Finlumia na VPS (unico script de runtime;
+# nao ha mais docker-compose para homologacao/producao)
 #
 # Uso:
 #   ./finlumia_backend.sh bd [-reset]
-#   ./finlumia_backend.sh <modulo> [-logs]
-#   ./finlumia_backend.sh -all
+#   ./finlumia_backend.sh <modulo> -hom|-prod [-logs]
+#   ./finlumia_backend.sh -all -hom|-prod
 #
 # Para chamar como comando global na VPS:
 #   1. Edite ~/.bashrc e adicione:
 #        export FINLUMIABACK_HOME=/caminho/para/o/projeto
 #        alias finlumiaback="$FINLUMIABACK_HOME/finlumia_backend.sh"
 #   2. Recarregue: source ~/.bashrc
-#   3. Agora pode usar de qualquer lugar: finlumiaback -all
+#   3. Agora pode usar de qualquer lugar: finlumiaback -all -prod
 #
 # Pre-requisitos:
 #   - docker e docker buildx instalados
-#   - Tars dos modulos gerados pelo finlumia.sh (./finlumia.sh -all -c -pro)
-#     e disponiveis em docker/build/<modulo>-pro.tar
+#   - Tars dos modulos gerados pelo finlumia.sh (./finlumia.sh -all -c -hom|-prod)
+#     e disponiveis em docker/build/<modulo>-<profile>.tar
 #   - Um unico arquivo *.backup (pg_dump formato custom) em docker/backup/,
 #     usado para restaurar o banco na criacao do container (ver deploy_db).
+#   - Segredos vem de shared/src/main/resources/shared-<profile>.properties,
+#     embutido no jar durante o build. Nao ha .env nem docker-compose aqui.
 # =============================================================================
 set -euo pipefail
 
@@ -35,7 +38,9 @@ fi
 # ---------------------------------------------------------------------------
 # Configuracao global
 # ---------------------------------------------------------------------------
-PROFILE="pro"
+# PROFILE e definido no parse de argumentos (-hom ou -prod), obrigatorio.
+PROFILE=""
+VALID_PROFILES="hom prod"
 NETWORK_NAME="finlumia-net"
 
 DB_CONTAINER="finlumiadb"
@@ -48,27 +53,9 @@ DB_NAME="${FINLUMIA_DB_NAME:-finlumia_transactions}"
 
 VALID_MODULES="configurator identify movement docs document"
 
-declare -A CONTAINER_NAMES=(
-  ["configurator"]="finlumia-configurator"
-  ["identify"]="finlumia-identify"
-  ["movement"]="finlumia-movement"
-  ["docs"]="finlumia-docs"
-  ["document"]="finlumia-document"
-)
-declare -A IMAGES=(
-  ["configurator"]="finlumia/configurator:latest"
-  ["identify"]="finlumia/identify:latest"
-  ["movement"]="finlumia/movement:latest"
-  ["docs"]="finlumia/docs:latest"
-  ["document"]="finlumia/document:latest"
-)
-declare -A TAR_FILES=(
-  ["configurator"]="docker/build/configurator-pro.tar"
-  ["identify"]="docker/build/identify-pro.tar"
-  ["movement"]="docker/build/movement-pro.tar"
-  ["docs"]="docker/build/docs-pro.tar"
-  ["document"]="docker/build/document-pro.tar"
-)
+# CONTAINER_NAMES/IMAGES/TAR_FILES sao montados em runtime com o sufixo do
+# profile (ver resolve_module_vars), pois hom e prod podem rodar lado a lado
+# no mesmo host no futuro. Hoje os dois apontam para a mesma VPS/porta.
 declare -A HOST_PORTS=(
   ["configurator"]="28081"
   ["identify"]="28083"
@@ -202,18 +189,25 @@ deploy_db() {
 # Deploy de modulo de aplicacao
 # ---------------------------------------------------------------------------
 
+# Nomes de container/imagem/tar dependem do profile ativo (hom ou prod), para
+# permitir os dois rodando lado a lado no mesmo host no futuro.
+container_name_for() { echo "finlumia-${1}-${PROFILE}"; }
+image_name_for()     { echo "finlumia/${1}:${PROFILE}"; }
+tar_file_for()        { echo "${PROJECT_ROOT}/docker/build/${1}-${PROFILE}.tar"; }
+
 deploy_module() {
   local module="$1"
-  local tar_file="${PROJECT_ROOT}/${TAR_FILES[$module]}"
-  local image="${IMAGES[$module]}"
-  local container="${CONTAINER_NAMES[$module]}"
+  local tar_file container image
+  tar_file="$(tar_file_for "$module")"
+  image="$(image_name_for "$module")"
+  container="$(container_name_for "$module")"
   local host_port="${HOST_PORTS[$module]}"
   local container_port="${CONTAINER_PORTS[$module]}"
   local bind_host="127.0.0.1"
 
   if [ ! -f "$tar_file" ]; then
     echo "ERRO: tar nao encontrado: $tar_file"
-    echo "       Gere os artefatos antes: ./finlumia.sh ${module} -c -pro"
+    echo "       Gere os artefatos antes: ./finlumia.sh ${module} -c -${PROFILE}"
     exit 1
   fi
 
@@ -246,16 +240,16 @@ deploy_module() {
 
   if [ "$module" = "docs" ]; then
     run_args+=(
-      -e "DOCS_MODULES_BASE_URL_CONFIGURATOR=http://${CONTAINER_NAMES[configurator]}:${CONTAINER_PORTS[configurator]}"
-      -e "DOCS_MODULES_BASE_URL_IDENTIFY=http://${CONTAINER_NAMES[identify]}:${CONTAINER_PORTS[identify]}"
-      -e "DOCS_MODULES_BASE_URL_MOVEMENT=http://${CONTAINER_NAMES[movement]}:${CONTAINER_PORTS[movement]}"
+      -e "DOCS_MODULES_BASE_URL_CONFIGURATOR=http://$(container_name_for configurator):${CONTAINER_PORTS[configurator]}"
+      -e "DOCS_MODULES_BASE_URL_IDENTIFY=http://$(container_name_for identify):${CONTAINER_PORTS[identify]}"
+      -e "DOCS_MODULES_BASE_URL_MOVEMENT=http://$(container_name_for movement):${CONTAINER_PORTS[movement]}"
     )
   fi
 
   run_args+=("$image")
   docker "${run_args[@]}"
 
-  echo "$module | container=$container | host=${bind_host}:${host_port} | image=$image | status=iniciado"
+  echo "$module | profile=$PROFILE | container=$container | host=${bind_host}:${host_port} | image=$image | status=iniciado"
 }
 
 # ---------------------------------------------------------------------------
@@ -264,11 +258,12 @@ deploy_module() {
 
 show_usage() {
   echo "Uso:"
-  echo "  $0 bd [-reset]          Sobe o banco de dados (com -reset apaga os dados)"
-  echo "  $0 <modulo> [-logs]     Sobe um modulo especifico e aguarda logs (opcional)"
-  echo "  $0 -all                 Sobe todos os modulos de aplicacao"
+  echo "  $0 bd [-reset]                    Sobe o banco de dados (com -reset apaga os dados)"
+  echo "  $0 <modulo> -hom|-prod [-logs]    Sobe um modulo especifico e aguarda logs (opcional)"
+  echo "  $0 -all -hom|-prod                Sobe todos os modulos de aplicacao"
   echo ""
   echo "Modulos disponiveis: $VALID_MODULES"
+  echo "Profiles disponiveis: $VALID_PROFILES"
   echo ""
   echo "Variaveis de ambiente aceitas:"
   echo "  FINLUMIABACK_HOME       Raiz do projeto (padrao: diretorio do script)"
@@ -309,6 +304,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -all)  FLAG_ALL=true ;;
     -logs) FLAG_LOGS=true ;;
+    -hom)  PROFILE="hom" ;;
+    -prod) PROFILE="prod" ;;
     -h|--help) show_usage; exit 0 ;;
     -*)
       echo "ERRO: flag desconhecida: $1"
@@ -333,6 +330,12 @@ fi
 
 if [ "$FLAG_ALL" = false ] && [ -z "$MODULE" ]; then
   echo "ERRO: informe um modulo ou use -all."
+  show_usage
+  exit 1
+fi
+
+if [ -z "$PROFILE" ]; then
+  echo "ERRO: informe -hom ou -prod."
   show_usage
   exit 1
 fi
@@ -366,5 +369,5 @@ for CURRENT_MODULE in $TARGET_MODULES; do
 done
 
 if [ "$FLAG_LOGS" = true ]; then
-  docker logs -f "${CONTAINER_NAMES[$MODULE]}"
+  docker logs -f "$(container_name_for "$MODULE")"
 fi

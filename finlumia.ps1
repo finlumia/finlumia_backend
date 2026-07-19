@@ -6,8 +6,9 @@ param(
     [switch]$t,
     [switch]$c,
     [switch]$s,
-    [switch]$pro,
-    [switch]$dev
+    [switch]$local,
+    [switch]$hom,
+    [switch]$prod
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,15 +20,7 @@ $BASE_IMAGE = "finlumia/base:finlumia-dev-almalinux10module_java21"
 $BASE_IMAGE_TAR = "docker/bases/finlumia-dev-almalinux10module_java21.tar"
 $DEV_CONTAINER = "finlumiadev"
 
-$HOST_PORTS_DEV = @{
-    "configurator" = 28081
-    "identify"     = 28083
-    "movement"     = 28084
-    "docs"         = 28082
-    "document"     = 28085
-}
-
-$HOST_PORTS_PRO = @{
+$HOST_PORTS = @{
     "configurator" = 28081
     "identify"     = 28083
     "movement"     = 28084
@@ -56,8 +49,8 @@ $VALID_MODULES = @("configurator","identify","movement","docs","document")
 if ($t -and $c) { Write-Host "ERRO: use -t ou -c."; exit 1 }
 if (-not $t -and -not $c) { Write-Host "ERRO: informe -t ou -c."; exit 1 }
 if ($s -and -not $t) { Write-Host "ERRO: -s so pode ser usado com -t."; exit 1 }
-if ($pro -and $dev) { Write-Host "ERRO: use -pro ou -dev."; exit 1 }
-if (-not $pro -and -not $dev) { Write-Host "ERRO: informe -pro ou -dev."; exit 1 }
+$profileCount = @($local, $hom, $prod | Where-Object { $_ }).Count
+if ($profileCount -ne 1) { Write-Host "ERRO: informe exatamente um de -local, -hom ou -prod."; exit 1 }
 if ($all -and $module) { Write-Host "ERRO: use modulo unico ou -all."; exit 1 }
 if (-not $all -and -not $module) { Write-Host "ERRO: informe um modulo ou use -all."; exit 1 }
 if (-not $all -and ($VALID_MODULES -notcontains $module)) {
@@ -65,7 +58,7 @@ if (-not $all -and ($VALID_MODULES -notcontains $module)) {
     exit 1
 }
 
-$PROFILE = if ($pro) { "pro" } else { "dev" }
+$PROFILE = if ($local) { "local" } elseif ($hom) { "hom" } else { "prod" }
 $TARGET_MODULES = if ($all) { $VALID_MODULES } else { @($module) }
 
 function Ensure-BaseImage {
@@ -116,9 +109,9 @@ Ensure-BaseImage
 foreach ($currentModule in $TARGET_MODULES) {
     $GRADLE_TASK = $GRADLE_TASKS[$currentModule]
     $DOCKERFILE = "docker/scripts/${currentModule}.Dockerfile"
-    $MODULE_IMAGE = "finlumia/${currentModule}:latest"
+    $MODULE_IMAGE = "finlumia/${currentModule}:${PROFILE}"
     $CONTAINER_PORT = $CONTAINER_PORTS[$currentModule]
-    $HOST_PORT = if ($PROFILE -eq "pro") { $HOST_PORTS_PRO[$currentModule] } else { $HOST_PORTS_DEV[$currentModule] }
+    $HOST_PORT = $HOST_PORTS[$currentModule]
     $CONTAINER_TEST = "test-${currentModule}-${PROFILE}"
 
     if (-not (Test-Path $DOCKERFILE)) {
