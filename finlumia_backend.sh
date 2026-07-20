@@ -231,13 +231,11 @@ deploy_module() {
     --restart unless-stopped
   )
 
-  if [ "$module" != "docs" ]; then
-    run_args+=(
-      -e "SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_CONTAINER}:5432/${DB_NAME}"
-      -e "SPRING_DATASOURCE_USERNAME=$DB_USER"
-      -e "SPRING_DATASOURCE_PASSWORD=$DB_PASS"
-    )
-  fi
+  run_args+=(
+    -e "SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_CONTAINER}:5432/${DB_NAME}"
+    -e "SPRING_DATASOURCE_USERNAME=$DB_USER"
+    -e "SPRING_DATASOURCE_PASSWORD=$DB_PASS"
+  )
 
   if [ "$module" = "docs" ]; then
     run_args+=(
