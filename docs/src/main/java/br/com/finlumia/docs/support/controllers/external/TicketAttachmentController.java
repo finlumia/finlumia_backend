@@ -38,7 +38,7 @@ public class TicketAttachmentController {
         this.ticketService = ticketService;
     }
 
-    @Operation(summary = "Solicitar URL de upload (10MB para imagem/documento, 150MB para video)",
+    @Operation(summary = "Solicitar URL de upload (10MB para imagem/documento, 100MB para video)",
             description = "O cliente envia o arquivo via PUT direto pra URL retornada, depois confirma com /complete.")
     @PostMapping(path = "/presign", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PresignUploadResponse> presign(
