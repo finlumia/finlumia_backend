@@ -7,6 +7,7 @@ import br.com.finlumia.docs.support.services.JwtAuthenticationFilter;
 import br.com.finlumia.docs.support.services.TicketAttachmentService;
 import br.com.finlumia.docs.support.services.TicketService;
 import br.com.finlumia.docs.support.views.PresignUploadResponse;
+import br.com.finlumia.docs.support.views.SignedUrlResponse;
 import br.com.finlumia.docs.support.views.TicketAttachmentView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -63,29 +64,32 @@ public class TicketAttachmentController {
                 .body(attachmentService.completeUpload(ticketId, attachmentId, callerId, callerRole, body));
     }
 
-    @Operation(summary = "Download de anexo",
-            description = "Redireciona para uma URL assinada do storage. Para video, serve sempre a versao " +
-                    "convertida quando disponivel — nunca o arquivo bruto (exceto admin/gerente em caso de falha).")
-    @GetMapping("/{attachmentId}/download")
-    public ResponseEntity<Void> download(
+    @Operation(summary = "URL assinada de download de anexo",
+            description = "Devolve a URL assinada do storage em JSON (nao redireciona) — precisa ser chamado via " +
+                    "fetch/XHR autenticado, ja que <video>/<img>/<a> nativos nao enviam o header Authorization. " +
+                    "Para video, serve sempre a versao convertida quando disponivel — nunca o arquivo bruto " +
+                    "(exceto admin/gerente em caso de falha).")
+    @GetMapping(path = "/{attachmentId}/download", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<SignedUrlResponse> download(
             HttpServletRequest request,
             @PathVariable UUID ticketId,
             @PathVariable UUID attachmentId) {
         UUID callerId = (UUID) request.getAttribute(JwtAuthenticationFilter.REQUEST_ATTR_USER_KEY);
         String callerRole = ticketService.getUserRole(callerId);
         URI target = attachmentService.presignDownloadRedirect(ticketId, attachmentId, callerId, callerRole);
-        return ResponseEntity.status(HttpStatus.FOUND).location(target).build();
+        return ResponseEntity.ok(new SignedUrlResponse(target.toString()));
     }
 
-    @Operation(summary = "Miniatura de anexo de video", description = "Redireciona para a URL assinada da miniatura.")
-    @GetMapping("/{attachmentId}/thumbnail")
-    public ResponseEntity<Void> thumbnail(
+    @Operation(summary = "URL assinada de miniatura de anexo de video",
+            description = "Devolve a URL assinada da miniatura em JSON (nao redireciona) — mesma ressalva do /download.")
+    @GetMapping(path = "/{attachmentId}/thumbnail", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<SignedUrlResponse> thumbnail(
             HttpServletRequest request,
             @PathVariable UUID ticketId,
             @PathVariable UUID attachmentId) {
         UUID callerId = (UUID) request.getAttribute(JwtAuthenticationFilter.REQUEST_ATTR_USER_KEY);
         String callerRole = ticketService.getUserRole(callerId);
         URI target = attachmentService.presignThumbnailRedirect(ticketId, attachmentId, callerId, callerRole);
-        return ResponseEntity.status(HttpStatus.FOUND).location(target).build();
+        return ResponseEntity.ok(new SignedUrlResponse(target.toString()));
     }
 }

@@ -591,7 +591,7 @@ Anexos **não** passam pelo servidor de aplicação — o upload é feito via UR
 1. `POST /api/v1/support/tickets/{ticketId}/attachments/presign` — valida tipo/tamanho, devolve uma URL de upload assinada (TTL curto).
 2. Cliente faz `PUT` do arquivo direto nessa URL.
 3. `POST /api/v1/support/tickets/{ticketId}/attachments/{attachmentId}/complete` — confirma o upload (verifica no MinIO) e grava o registro no banco.
-4. Download/miniatura: `GET .../attachments/{id}/download` e `.../thumbnail` respondem com `302` para uma URL assinada de leitura, gerada na hora.
+4. Download/miniatura: `GET .../attachments/{id}/download` e `.../thumbnail` devolvem `{"url": "..."}` (JSON, `200`) com uma URL assinada de leitura gerada na hora — **não** é redirect `302`. Isso é proposital: como esses endpoints exigem JWT, e `<video>`/`<img>`/`<a>` nativos do navegador não enviam o header `Authorization`, o cliente precisa chamar via `fetch()` autenticado e só then usar a URL devolvida (essa sim, sem token, já assinada) como `src`/link.
 
 Limites de tipo/tamanho (validados no `TicketAttachmentService`):
 
