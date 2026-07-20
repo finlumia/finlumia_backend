@@ -5,6 +5,7 @@
 #
 # Uso:
 #   ./finlumia_backend.sh bd [-reset]
+#   ./finlumia_backend.sh minio
 #   ./finlumia_backend.sh <modulo> -hom|-pro [-logs]
 #   ./finlumia_backend.sh -all -hom|-pro
 #
@@ -50,6 +51,25 @@ DB_VOLUME_NAME="finlumia-postgres-data"
 DB_USER="${FINLUMIA_DB_USER:-papadopoulos}"
 DB_PASS="${FINLUMIA_DB_PASS:?FINLUMIA_DB_PASS obrigatorio. Execute: export FINLUMIA_DB_PASS=<sua-senha>}"
 DB_NAME="${FINLUMIA_DB_NAME:-finlumia_transactions}"
+
+# MinIO (storage de anexos de ticket). MINIO_PASS/MINIO_PUBLIC_ENDPOINT nao
+# usam o padrao ${VAR:?...} do DB_PASS aqui em cima: exigir isso pra QUALQUER
+# deploy (ex: um deploy so do modulo "identify") obrigaria a exportar um
+# segredo que esse modulo nem usa. Sao validados sob demanda em
+# require_minio_config(), chamada so por deploy_minio e pelo bloco docs de
+# deploy_module.
+MINIO_CONTAINER="finlumia-minio"
+MINIO_IMAGE="minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1"
+MINIO_HOST_PORT="9000"
+MINIO_CONSOLE_PORT="9001"
+MINIO_VOLUME_NAME="finlumia-minio-data"
+MINIO_BUCKET="finlumia-support-attachments"
+MINIO_USER="${FINLUMIA_MINIO_USER:-finlumia-storage}"
+MINIO_PASS="${FINLUMIA_MINIO_PASS:-}"
+MINIO_PUBLIC_ENDPOINT="${FINLUMIA_MINIO_PUBLIC_ENDPOINT:-}"
+# CORS do MinIO e configurado no servidor (nao existe PutBucketCors por
+# bucket via API — MinIO responde 501 pra essa chamada).
+MINIO_CORS_ORIGIN="${FINLUMIA_MINIO_CORS_ORIGIN:-https://finlumia.thiagobenevide.com}"
 
 VALID_MODULES="configurator identify movement docs document"
 
@@ -105,6 +125,17 @@ remove_db_volume() {
   if docker volume ls --format "{{.Name}}" | grep -qx "$DB_VOLUME_NAME"; then
     echo "Removendo volume: $DB_VOLUME_NAME"
     docker volume rm "$DB_VOLUME_NAME" >/dev/null
+  fi
+}
+
+require_minio_config() {
+  if [ -z "$MINIO_PASS" ]; then
+    echo "ERRO: FINLUMIA_MINIO_PASS obrigatorio. Execute: export FINLUMIA_MINIO_PASS=<sua-senha>"
+    exit 1
+  fi
+  if [ -z "$MINIO_PUBLIC_ENDPOINT" ]; then
+    echo "ERRO: FINLUMIA_MINIO_PUBLIC_ENDPOINT obrigatorio. Execute: export FINLUMIA_MINIO_PUBLIC_ENDPOINT=https://<dominio>/storage"
+    exit 1
   fi
 }
 
@@ -187,6 +218,50 @@ deploy_db() {
 }
 
 # ---------------------------------------------------------------------------
+# Deploy do MinIO (storage de anexos de ticket)
+# ---------------------------------------------------------------------------
+
+deploy_minio() {
+  require_minio_config
+
+  remove_container "$MINIO_CONTAINER"
+  ensure_network
+
+  echo "Baixando imagem do MinIO: $MINIO_IMAGE"
+  docker pull "$MINIO_IMAGE"
+
+  echo "Iniciando container: $MINIO_CONTAINER"
+  docker run -d \
+    --name "$MINIO_CONTAINER" \
+    --network "$NETWORK_NAME" \
+    -p "127.0.0.1:${MINIO_HOST_PORT}:9000" \
+    -p "127.0.0.1:${MINIO_CONSOLE_PORT}:9001" \
+    -e "MINIO_ROOT_USER=$MINIO_USER" \
+    -e "MINIO_ROOT_PASSWORD=$MINIO_PASS" \
+    -e "MINIO_API_CORS_ALLOW_ORIGIN=$MINIO_CORS_ORIGIN" \
+    -v "${MINIO_VOLUME_NAME}:/data" \
+    --health-cmd "curl -f http://localhost:9000/minio/health/live" \
+    --health-interval=5s \
+    --health-timeout=5s \
+    --health-retries=10 \
+    --health-start-period=10s \
+    --restart unless-stopped \
+    "$MINIO_IMAGE" server /data --console-address ":9001"
+
+  echo "Aguardando MinIO ficar saudavel..."
+  for _ in $(seq 1 30); do
+    if docker inspect --format='{{.State.Health.Status}}' "$MINIO_CONTAINER" 2>/dev/null | grep -qx "healthy"; then
+      echo "MinIO | container=$MINIO_CONTAINER | api=127.0.0.1:${MINIO_HOST_PORT} | console=127.0.0.1:${MINIO_CONSOLE_PORT} | status=healthy"
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "AVISO: container iniciado, mas healthcheck nao reportou healthy ainda."
+  docker ps --filter "name=$MINIO_CONTAINER" --format "table {{.Names}}\t{{.Status}}"
+}
+
+# ---------------------------------------------------------------------------
 # Deploy de modulo de aplicacao
 # ---------------------------------------------------------------------------
 
@@ -238,7 +313,13 @@ deploy_module() {
   )
 
   if [ "$module" = "docs" ]; then
+    require_minio_config
     run_args+=(
+      -e "MINIO_INTERNAL_ENDPOINT=http://${MINIO_CONTAINER}:9000"
+      -e "MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT}"
+      -e "MINIO_ACCESS_KEY=$MINIO_USER"
+      -e "MINIO_SECRET_KEY=$MINIO_PASS"
+      -e "MINIO_BUCKET=$MINIO_BUCKET"
       -e "DOCS_MODULES_BASE_URL_CONFIGURATOR=http://$(container_name_for configurator):${CONTAINER_PORTS[configurator]}"
       -e "DOCS_MODULES_BASE_URL_IDENTIFY=http://$(container_name_for identify):${CONTAINER_PORTS[identify]}"
       -e "DOCS_MODULES_BASE_URL_MOVEMENT=http://$(container_name_for movement):${CONTAINER_PORTS[movement]}"
@@ -258,6 +339,7 @@ deploy_module() {
 show_usage() {
   echo "Uso:"
   echo "  $0 bd [-reset]                    Sobe o banco de dados (com -reset apaga os dados)"
+  echo "  $0 minio                          Sobe o storage de anexos (MinIO)"
   echo "  $0 <modulo> -hom|-pro [-logs]    Sobe um modulo especifico e aguarda logs (opcional)"
   echo "  $0 -all -hom|-pro                Sobe todos os modulos de aplicacao"
   echo ""
@@ -265,10 +347,15 @@ show_usage() {
   echo "Profiles disponiveis: $VALID_PROFILES"
   echo ""
   echo "Variaveis de ambiente aceitas:"
-  echo "  FINLUMIABACK_HOME       Raiz do projeto (padrao: diretorio do script)"
-  echo "  FINLUMIA_DB_USER        Usuario do banco (padrao: papadopoulos)"
-  echo "  FINLUMIA_DB_PASS        Senha do banco"
-  echo "  FINLUMIA_DB_NAME        Nome do banco (padrao: finlumia_transactions)"
+  echo "  FINLUMIABACK_HOME            Raiz do projeto (padrao: diretorio do script)"
+  echo "  FINLUMIA_DB_USER             Usuario do banco (padrao: papadopoulos)"
+  echo "  FINLUMIA_DB_PASS             Senha do banco"
+  echo "  FINLUMIA_DB_NAME             Nome do banco (padrao: finlumia_transactions)"
+  echo "  FINLUMIA_MINIO_USER          Usuario do MinIO (padrao: finlumia-storage)"
+  echo "  FINLUMIA_MINIO_PASS          Senha do MinIO (obrigatorio pra 'minio' e pro modulo 'docs')"
+  echo "  FINLUMIA_MINIO_PUBLIC_ENDPOINT  URL publica do MinIO, ex: https://<dominio>/storage"
+  echo "                                (obrigatorio pro modulo 'docs')"
+  echo "  FINLUMIA_MINIO_CORS_ORIGIN   Origin liberado no MinIO (padrao: https://finlumia.thiagobenevide.com)"
   echo ""
   echo "Backup do banco:"
   echo "  Coloque um unico arquivo *.backup em docker/backup/. Ele e montado"
@@ -291,6 +378,12 @@ if [ "${1:-}" = "bd" ]; then
     exit 1
   fi
   deploy_db "$RESET_DATA"
+  exit 0
+fi
+
+# --- Subcomando minio ---
+if [ "${1:-}" = "minio" ]; then
+  deploy_minio
   exit 0
 fi
 

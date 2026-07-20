@@ -331,19 +331,13 @@ public class TicketService {
 
     private List<TicketAttachmentView> loadAttachments(UUID ticketId) {
         String sql = """
-                SELECT id, file_name, file_size_bytes, mime_type, created_at
+                SELECT id, file_name, file_size_bytes, mime_type, conversion_status,
+                       thumbnail_object_key, created_at
                 FROM docs.ticket_attachments
                 WHERE ticket_id = ?
                 ORDER BY created_at ASC
                 """;
-        return jdbc.query(sql, (rs, rowNum) -> new TicketAttachmentView(
-                rs.getObject("id", UUID.class),
-                rs.getString("file_name"),
-                rs.getInt("file_size_bytes"),
-                rs.getString("mime_type"),
-                "/api/v1/support/tickets/" + ticketId + "/attachments/" + rs.getObject("id", UUID.class) + "/download",
-                rs.getTimestamp("created_at").toInstant()),
-                ticketId);
+        return jdbc.query(sql, (rs, rowNum) -> TicketAttachmentService.mapAttachmentView(rs, ticketId), ticketId);
     }
 
     private TicketListItem mapListItem(ResultSet rs) throws SQLException {

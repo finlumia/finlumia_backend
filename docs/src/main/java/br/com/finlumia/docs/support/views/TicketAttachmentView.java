@@ -11,6 +11,8 @@ public record TicketAttachmentView(
         @JsonProperty("file_size_bytes") int fileSizeBytes,
         @JsonProperty("mime_type") String mimeType,
         String url,
+        @JsonProperty("thumbnail_url") String thumbnailUrl,
+        @JsonProperty("conversion_status") String conversionStatus,
         @JsonProperty("created_at") Instant createdAt
 ) {
 }

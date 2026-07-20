@@ -8,7 +8,8 @@ import org.springframework.context.annotation.Configuration;
         InternalSecurityProperties.class,
         ModuleSecurityProperties.class,
         PublicApiProperties.class,
-        JwtProperties.class
+        JwtProperties.class,
+        MinioProperties.class
 })
 public class SupportPropertiesConfig {
 }
